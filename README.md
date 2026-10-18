@@ -81,15 +81,19 @@ The server has no password. Keep the default `127.0.0.1` unless you trust everyo
 
 ## Browser app (no server)
 
-`docs/app/index.html` is a complete version of Munken Loops that runs **entirely in the visitor's browser**: audio analysis, video analysis, planning and drawing use the visitor's own CPU and GPU. Nothing is uploaded, so any static host (including GitHub Pages) can serve it for any number of users. It is designed for slow, soft mixes.
+`docs/app/index.html` is a complete version of Munken Loops that runs **entirely in the visitor's browser**: audio analysis, video analysis, planning and rendering use the visitor's own CPU and GPU. Nothing is uploaded, so any static host (including GitHub Pages) can serve it for any number of users. It is designed for slow, soft mixes of long loops (tested in mind with loops of 16-100 seconds).
 
-- **Chill by default:** shots last several bars, long crossfades, a slow breathing zoom. Moods (Ambient, Chill, Groove, Energetic) set everything at once.
-- **Sets of similar loops:** each section of the song gets 2-3 loops of a similar style that alternate slowly (A-B-A-B). Sections that sound alike reuse the same loops, and a set can slowly evolve.
+- **Export queue, no preview:** add one or more exports (up to 10 versions with different seeds), and they render one after another. Every job shows status, progress, time left, a live thumbnail, a timeline of the plan (sections, shots, layers) and how many loops were used. You can **pause, resume, stop** (the part already rendered is kept), cancel, reorder waiting jobs, re-run with a new seed, and download the result.
+- **MP4 export:** browsers that can record H.264 (Chrome and Edge on Windows/macOS, Safari) save a real `.mp4`. Other browsers can only record WebM; the app then shows the one-line ffmpeg command to convert it.
+- **Chill by default:** shots last 8 bars (about 16 s at 120 BPM), crossfades are 8 beats long, and there is a slow breathing zoom. Moods (Ambient, Chill, Groove, Energetic) set everything at once.
+- **Sets of similar loops:** each section gets 2-4 loops of a similar style that alternate slowly. Sections that sound alike reuse the same loops, and a set can slowly evolve.
+- **Every loop is used:** *Use every loop* adds not-yet-used loops as short layers on top of the longer shots, so a 10-minute mix can show all 100 loops without fast cutting. The queue shows "N/100 loops used".
+- **VJ-style layers and looks** (inspired by Resolume, Visualz and VIDIFOLD): second-clip layers with blend modes (screen, add, overlay, soft-light, lighten, difference), a colour tint per song section, optional mirror, echo trails, slow motion in calm parts, and music reactivity that makes layers, tint and breathing swell with the loudness.
+- **Advanced settings** are folded away under each group, so the main view stays simple.
 - **Up to 100 loops per mix.** If you add more, 100 are drawn at random (press *Draw a new selection* for another draw).
 - **CLIP in the browser:** tick *Use CLIP* to let an AI model judge visual similarity, and optionally type a *theme* ("dark forest", "slow water"). The model (about 100-150 MB, via transformers.js) is downloaded once from huggingface.co and cached by the browser. It uses WebGPU when available.
-- **Live use:** repeat the track with a new mix every round, go fullscreen, or record to a file (Chrome/Edge can stream the recording straight to disk).
 
-Open `docs/app/index.html` from the published site (`https://munkenbissniss.github.io/munken-loops/app/`). Playback is real time, so a recording takes as long as the track. Every setting has a short explanation in the app.
+Open it from the published site (`https://munkenbissniss.github.io/munken-loops/app/`). Rendering runs in real time, so a 10-minute track takes about 10 minutes per export, and no sound plays. Keep the tab open while exporting. Recordings are written to the browser's private storage (not held in memory) until you download or remove them. Every setting has a short explanation in the app.
 
 ## Parameter reference
 

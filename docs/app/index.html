@@ -3,38 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Munken Loops web app</title>
+<title>Munken Loops – video mix exporter</title>
 <style>
-:root{--bg:#f3f4f8;--ink:#14182b;--mute:#5a607a;--line:#d5d8e6;--panel:#fff;--b:#ff3d81;--bad:#d1334a;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--bg:#10122a;--ink:#eceefb;--mute:#a0a6c8;--line:#2a2e57;--panel:#171a3a;--b:#ff6fa3;--bad:#ff7088;color-scheme:dark}}
+:root{--bg:#f3f4f8;--ink:#14182b;--mute:#5a607a;--line:#d5d8e6;--panel:#fff;--b:#ff3d81;--a:#2b3af0;--ok:#12906f;--bad:#d1334a;--warn:#b7791f;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#10122a;--ink:#eceefb;--mute:#a0a6c8;--line:#2a2e57;--panel:#171a3a;--b:#ff6fa3;--a:#7f8bff;--ok:#3fd6a4;--bad:#ff7088;--warn:#f0b254;color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:1060px;margin:0 auto;padding:20px}h1{font-size:2rem;letter-spacing:-.03em;margin:6px 0 2px}h2{font-size:1.1rem;margin:0 0 8px}
+.wrap{max-width:1080px;margin:0 auto;padding:20px}h1{font-size:2rem;letter-spacing:-.03em;margin:6px 0 2px}h2{font-size:1.1rem;margin:0 0 8px}
 .mute,.sub{color:var(--mute)}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
 .two{display:grid;grid-template-columns:1fr 1.6fr;gap:16px}@media(max-width:800px){.two{grid-template-columns:1fr}}
-button{font:inherit;cursor:pointer;border:2px solid var(--ink);background:transparent;color:var(--ink);padding:6px 16px;border-radius:999px;font-weight:600}
-button.main{background:var(--ink);color:var(--bg)}button.on{background:var(--ink);color:var(--bg)}button.sm{padding:2px 12px;font-size:.9rem}button:disabled{opacity:.4;cursor:default}
-button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--b);outline-offset:2px}
+button,.btn{font:inherit;cursor:pointer;border:2px solid var(--ink);background:transparent;color:var(--ink);padding:6px 16px;border-radius:999px;font-weight:600;text-decoration:none;display:inline-block}
+button.main{background:var(--ink);color:var(--bg)}button.on{background:var(--ink);color:var(--bg)}.sm{padding:2px 12px!important;font-size:.88rem}button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--b);outline-offset:2px}
 .drop{border:2px dashed var(--line);border-radius:10px;padding:12px;text-align:center;color:var(--mute);margin-bottom:8px}.drop.over{border-color:var(--b);color:var(--ink)}
-#thumbs{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;max-height:170px;overflow:auto}#thumbs img{width:64px;height:36px;object-fit:cover;border-radius:3px}
-details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;font-weight:700}.intro{margin:6px 0 4px;color:var(--mute);font-size:.92rem}
-.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px 26px;margin-top:8px}.f label{display:block;font-weight:600;font-size:.92rem}
+#thumbs{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;max-height:150px;overflow:auto}#thumbs img{width:64px;height:36px;object-fit:cover;border-radius:3px}
+details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;font-weight:700}details.adv{border:1px dashed var(--line);border-radius:8px;padding:6px 10px;margin-top:12px}details.adv>summary{font-weight:600;color:var(--mute)}
+.intro{margin:6px 0 4px;color:var(--mute);font-size:.92rem}.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px 26px;margin-top:8px}.f label{display:block;font-weight:600;font-size:.92rem}
 .f .c{display:flex;gap:8px;align-items:center}.f input[type=range]{flex:1;accent-color:var(--b)}.f output{min-width:4.5ch;text-align:right;font-variant-numeric:tabular-nums}
-.f select,.f input[type=number],.f input[type=text]{width:100%;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.f select,.f input[type=number],.f input[type=text],.bar input[type=text]{width:100%;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .f .h{font-size:.8rem;color:var(--mute);margin-top:2px}.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.bar label{display:flex;gap:6px;align-items:center}
-#stage{width:100%;max-height:70vh;background:#000;border-radius:10px;display:block;aspect-ratio:16/9;object-fit:contain;margin-top:10px}#tl{width:100%;height:64px;display:block;margin-top:8px}
-#st{min-height:1.4em;margin-top:8px}#st.err{color:var(--bad)}.pace{font-size:.9rem;background:var(--bg);border-radius:8px;padding:6px 10px;margin:6px 0}
+.pace{font-size:.9rem;background:var(--bg);border-radius:8px;padding:6px 10px;margin:6px 0}#st{min-height:1.4em}#st.err{color:var(--bad)}.note{font-size:.85rem;color:var(--warn)}
+#sum{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}.pill{border:1px solid var(--line);border-radius:999px;padding:1px 12px;font-size:.88rem;background:var(--bg)}
+.job{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--bg)}.jh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.chip{font-size:.78rem;padding:1px 10px;border-radius:999px;border:1px solid currentColor;font-weight:700}.waiting,.preparing{color:var(--a)}.rendering{color:var(--b)}.paused{color:var(--warn)}.done{color:var(--ok)}.failed,.stopped{color:var(--bad)}
+.jb{display:flex;gap:12px;margin-top:8px}.jb canvas.jt{width:192px;height:108px;background:#000;border-radius:8px;flex:none}@media(max-width:700px){.jb{flex-direction:column}}
+.jr{flex:1;min-width:0}.prog{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:2px 0}.prog i{display:block;height:100%;background:var(--b);width:0}canvas.jl{width:100%;height:44px;display:block;margin:6px 0}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.fmt{font-size:.82rem;margin-top:6px}
 </style>
 </head>
 <body><div class="wrap">
 <h1>Munken Loops</h1>
-<p class="sub">Slow, soft video mixes for your music. Everything runs in your browser (CPU and GPU), and your files are never uploaded. Add a rhythmic track and up to 100 seamless video loops, then press Play.</p>
+<p class="sub">Slow, soft video mixes for your music, exported as a video file. Everything runs in your browser (CPU and GPU), and your files are never uploaded. Add a rhythmic track and up to 100 seamless loops, then add one or more exports to the queue.</p>
 
 <div class="two">
  <div class="card"><h2>1. Music</h2>
   <div class="drop" id="dA">Drop an audio file or <button class="sm" id="bA">choose file</button></div><div id="an" class="mute">No file chosen</div></div>
  <div class="card"><h2>2. Video loops <span class="mute" id="vc"></span></h2>
   <div class="drop" id="dV">Drop videos or a folder, or <button class="sm" id="bV">choose files</button> <button class="sm" id="bD">choose folder</button></div>
-  <div class="bar"><button class="sm" id="redraw" disabled>Draw a new selection of 100</button><button class="sm" id="anaL" disabled>Analyze loops now</button></div>
+  <div class="bar"><button class="sm" id="redraw" disabled>Draw a new selection of 100</button><button class="sm" id="anaL" disabled>Analyze loops now (shows thumbnails)</button></div>
   <div id="thumbs"></div></div>
 </div>
 <input type="file" id="fA" accept="audio/*" hidden><input type="file" id="fV" accept="video/*" multiple hidden><input type="file" id="fD" webkitdirectory multiple hidden>
@@ -42,13 +47,18 @@ details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;fo
 <div class="card"><h2>3. Mix settings</h2>
  <div class="bar"><b>Mood:</b> <span id="pre"></span><span class="mute" id="pmsg"></span></div><div id="groups"></div></div>
 
-<div class="card">
- <div class="bar"><button class="main" id="play">Play</button><button id="stop" disabled>Stop</button><button id="fs">Fullscreen</button>
-  <label><input type="checkbox" id="rec"> Record to file</label><label>Start at <input type="number" id="t0" value="0" min="0" style="width:70px"> s</label></div>
- <div id="st" class="mute"></div>
- <canvas id="stage" width="1920" height="1080"></canvas><canvas id="tl" width="1000" height="64"></canvas><div id="out"></div>
-</div>
-<p class="mute">Keys: Space = play/stop, F = fullscreen. Playback runs in real time, so a recording takes as long as the track. Keep this tab visible while recording. Chrome, Edge or Safari recommended; Chrome and Edge can record straight to disk, which is best for long tracks.</p>
+<div class="card"><h2>4. Export</h2>
+ <div class="bar"><label>Name <input type="text" id="jname" placeholder="(track name)" style="width:220px"></label>
+  <label>Versions <input type="number" id="nver" value="1" min="1" max="10" style="width:60px"></label>
+  <button class="main" id="add">Add to export queue</button></div>
+ <div class="mute" style="font-size:.85rem;margin-top:4px">Each version gets its own random seed (or the seed you set, plus 1, 2, …). Settings are saved with each job, so you can change them and queue more.</div>
+ <div id="st" class="mute"></div><div class="fmt" id="fmt"></div></div>
+
+<div class="card"><h2>Queue</h2>
+ <div id="sum"></div>
+ <div class="bar" style="margin-bottom:10px"><button class="sm" id="qpause" disabled>Pause</button><button class="sm" id="qstop" disabled>Stop current</button><button class="sm" id="qclear">Clear finished</button></div>
+ <div id="queue"><p class="mute">The queue is empty.</p></div>
+ <p class="mute" style="font-size:.85rem">Export runs in real time, so a 10-minute track takes about 10 minutes. Keep this tab open while exporting. No sound plays. Finished files stay in this browser until you download or remove them.</p></div>
 </div>
 
 <script>
@@ -126,16 +136,17 @@ function normLoops(L,clipW){
  const th=L.every(l=>l.theme!=null)?(()=>{const t=L.map(l=>l.theme),m=mean(t,0,n),s=Math.sqrt(mean(t.map(x=>(x-m)**2),0,n))+1e-9;return t.map(x=>clamp((x-m)/s,-2,2)/2)})():L.map(()=>0);
  L.forEach((l,i)=>l.th=th[i]);return S;
 }
-
-/* the mix: sections get 2-3 similar loops that alternate slowly, long shots on bar lines */
+/* the mix: sections get 2-4 similar loops that alternate slowly; accent layers and per-section looks add variety; every loop gets used when possible */
 function plan(A,L,S,o,rnd){
- const nb=A.nb,n=L.length,used=new Array(n).fill(0),sets={},slots=[],brk=new Array(nb).fill(false);
+ const BARS=[1,2,4,8,16,32],nb=A.nb,n=L.length,used=new Array(n).fill(0),sets={},slots=[],looks={},brk=new Array(nb).fill(false);
  A.breaks.forEach(([a,b])=>{for(let i=a;i<b;i++)brk[i]=true});
- const secs=A.sections.map(([a,b],i)=>({a,b,e:mean(A.energy,a,b),c:A.cluster[i]})),mu=()=>mean(used,0,n);
+ const secs=A.sections.map(([a,b],i)=>({a,b,e:mean(A.energy,a,b),c:A.cluster[i]})),mu=()=>mean(used,0,n),cov=j=>o.useAll&&used[j]==0?1.2:0;
  const pick=(sc,temp)=>{const mx=Math.max(...sc.map(x=>x[0])),w=sc.map(x=>Math.exp((x[0]-mx)/temp)),t=w.reduce((a,b)=>a+b);let r=rnd()*t;for(let i=0;i<sc.length;i++){r-=w[i];if(r<=0)return sc[i][1]}return sc[sc.length-1][1]};
  const simTo=(j,set)=>set.reduce((s,k)=>s+S[j][k],0)/set.length;
- const makeSet=(e,size)=>{const set=[pick(L.map((l,j)=>[-o.matchEnergy*3*Math.abs(l.energy-e)-.6*used[j]/(1+mu())+o.themeWeight*3*l.th,j]),.15+.6*o.variety)];
-  while(set.length<Math.min(size,n)){const c=[];for(let j=0;j<n;j++)if(!set.includes(j))c.push([o.styleMatch*4*simTo(j,set)-o.matchEnergy*2*Math.abs(L[j].energy-e)-.4*used[j]/(1+mu())+o.themeWeight*2*L[j].th,j]);set.push(pick(c,.1+.3*o.variety))}
+ const lookOf=c=>looks[c]??=(()=>{const v=o.lookVar,bl=o.layerBlend=='auto'?['screen','soft-light','overlay','lighten'][Math.floor(rnd()*4)]:o.layerBlend;
+  return{hue:Math.floor(rnd()*360),tint:v>0?o.tintAmount*(.3+.7*v):0,mirror:o.mirror=='always'?1:(o.mirror=='sometimes'&&rnd()<.25+.3*v)?1:0,blend:bl}})();
+ const makeSet=(e,size)=>{const set=[pick(L.map((l,j)=>[-o.matchEnergy*3*Math.abs(l.energy-e)-.6*used[j]/(1+mu())+cov(j)+o.themeWeight*3*l.th,j]),.15+.6*o.variety)];
+  while(set.length<Math.min(size,n)){const c=[];for(let j=0;j<n;j++)if(!set.includes(j))c.push([o.styleMatch*4*simTo(j,set)-o.matchEnergy*2*Math.abs(L[j].energy-e)-.4*used[j]/(1+mu())+cov(j)+o.themeWeight*2*L[j].th,j]);set.push(pick(c,.1+.3*o.variety))}
   set.forEach(j=>used[j]++);return set};
  let prevLast=-1;
  secs.forEach((sec,si)=>{
@@ -144,67 +155,91 @@ function plan(A,L,S,o,rnd){
   while(i<sec.b){
    const e=mean(A.energy,i,Math.min(i+8,nb)),nd=A.drops.find(d=>d>i&&d<sec.b),kind=A.drops.includes(i)?'drop':brk[i]?'break':A.buildup[i]?'buildup':'normal';
    const bars=o.shotBars*Math.pow(2,(.5-e)*o.follow*2)*(kind=='break'?1.5:kind=='buildup'?.75:1);
-   let q=clamp(Math.round(Math.log2(bars)),0,4);if(rnd()<o.irregular)q=clamp(q+(rnd()<.5?-1:1),0,4);
-   let len=clamp(BARS[q],o.minBars,o.maxBars)*4;if(sec.b-i-len<Math.max(o.minBars*4,len*.5))len=sec.b-i;if(o.accent&&nd!=null&&nd-i<len)len=nd-i;len=Math.max(1,len);
+   let q=clamp(Math.round(Math.log2(bars)),0,5);if(rnd()<o.irregular)q=clamp(q+(rnd()<.5?-1:1),0,5);
+   const minB=o.minBars*4;let len=clamp(BARS[q],o.minBars,o.maxBars)*4;if(sec.b-i-len<Math.max(minB,len*.5))len=sec.b-i;if(o.accent&&nd!=null&&nd-i<len&&nd-i>=minB)len=nd-i;len=Math.max(1,len);
    if(o.evolve>0&&set.length>1&&(i-evo)/4>=o.evolve){const r=set.filter(j=>j!==last).sort((a,b)=>(age[a]??-1)-(age[b]??-1))[0],rest=set.filter(j=>j!==r),c=[];
-    for(let j=0;j<n;j++)if(!set.includes(j))c.push([o.styleMatch*4*simTo(j,rest)-o.matchEnergy*2*Math.abs(L[j].energy-sec.e)-.4*used[j]/(1+mu()),j]);
+    for(let j=0;j<n;j++)if(!set.includes(j))c.push([o.styleMatch*4*simTo(j,rest)-o.matchEnergy*2*Math.abs(L[j].energy-sec.e)-.4*used[j]/(1+mu())+cov(j),j]);
     if(c.length){const nj=pick(c,.2);set[set.indexOf(r)]=nj;used[nj]++}evo=i}
    const cand=set.filter(j=>j!==last),pl=(cand.length?cand:set).slice().sort((a,b)=>(age[a]??-1)-(age[b]??-1)),j=pl.length>1&&rnd()<.25*o.variety?pl[1]:pl[0];
    age[j]=cnt++;last=j;
-   slots.push({i0:i,i1:i+len,t0:A.bt[i],t1:A.bt[i+len],energy:mean(A.energy,i,i+len),kind,loop:j,sec:si});i+=len}
+   slots.push({i0:i,i1:i+len,t0:A.bt[i],t1:A.bt[i+len],energy:mean(A.energy,i,i+len),kind,loop:j,sec:si,cluster:sec.c});i+=len}
   prevLast=last});
- slots.forEach((s,k)=>{s.xf=0;if(k&&o.fade>0){const beat=(s.t1-s.t0)/(s.i1-s.i0);let x=o.fade*beat*(s.kind=='break'||s.energy<.3?1.5:1);if(s.kind=='drop')x=Math.min(x,beat);
+ slots.forEach((s,k)=>{lookOf(s.cluster);s.xf=0;if(k&&o.fade>0){const beat=(s.t1-s.t0)/(s.i1-s.i0);let x=o.fade*beat*(s.kind=='break'||s.energy<.3?1.5:1);if(s.kind=='drop')x=Math.min(x,beat);
   s.xf=Math.min(x,.4*(s.t1-s.t0),.4*(slots[k-1].t1-slots[k-1].t0))}});
- return slots;
+ // accent layers (like a second layer in a VJ deck): two possible windows per long shot
+ const layers=[],wins=slots.map(()=>[null,null,null]);
+ const addLayer=(k,w,j)=>{const s=slots[k],d=s.t1-s.t0,t0=s.t0+d*[.08,.38,.68][w],t1=t0+d*.26*clamp(o.layerLen/.6,.3,1.2);wins[k][w]=j;used[j]++;
+  layers.push({t0,t1,loop:j,blend:lookOf(s.cluster).blend,alpha:o.layerOpacity,fade:Math.min(6,(t1-t0)/3),slot:k})};
+ slots.forEach((s,k)=>{if(s.t1-s.t0<6||s.kind=='drop')return;
+  for(let w=0;w<3;w++)if(rnd()<o.layerDensity*[1,.6,.4][w]){const c=[];for(let j=0;j<n;j++)if(j!==s.loop)c.push([(o.useAll&&used[j]==0?4:0)-.5*used[j]/(1+mu())+o.styleMatch*1.5*S[j][s.loop]-o.matchEnergy*Math.abs(L[j].energy-s.energy)+.3*rnd(),j]);
+   if(c.length)addLayer(k,w,pick(c,.3))}});
+ const app=()=>{const a=new Array(n).fill(0);slots.forEach(s=>a[s.loop]++);layers.forEach(l=>a[l.loop]++);return a};
+ if(o.useAll){const a=app(),un=[];a.forEach((c,j)=>{if(!c)un.push(j)});const free=[];
+  slots.forEach((s,k)=>{if(s.t1-s.t0>=6&&s.kind!='drop')for(let w=0;w<3;w++)if(wins[k][w]==null)free.push([k,w])});
+  un.sort((x,y)=>L[x].energy-L[y].energy);free.sort((x,y)=>slots[x[0]].energy-slots[y[0]].energy);const taken=new Set();
+  un.forEach((j,u)=>{if(taken.size>=free.length)return;let f=Math.round(u*(free.length-1)/Math.max(1,un.length-1));while(taken.has(f))f=(f+1)%free.length;taken.add(f);addLayer(free[f][0],free[f][1],j)})}
+ layers.sort((x,y)=>x.t0-y.t0);const a=app();
+ return{slots,layers,looks,coverage:{used:a.filter(x=>x>0).length,total:n}};
 }
+
 /* CORE:END */
 
-/* ---------------- settings UI ---------------- */
-const R=(k,l,min,max,step,v,h)=>({k,l,t:'r',min,max,step,v,h}),Sel=(k,l,op,v,h)=>({k,l,t:'s',op,v,h}),Chk=(k,l,v,h)=>({k,l,t:'c',v,h}),Num=(k,l,h)=>({k,l,t:'n',v:'',h});
+/* ---------------- settings ---------------- */
+const R=(k,l,min,max,step,v,h,adv)=>({k,l,t:'r',min,max,step,v,h,adv}),Sel=(k,l,op,v,h,adv)=>({k,l,t:'s',op,v,h,adv}),Chk=(k,l,v,h,adv)=>({k,l,t:'c',v,h,adv}),Num=(k,l,h,adv)=>({k,l,t:'n',v:'',h,adv});
 const ON=['beat','bar','kick'];
 const DEFS=[
  ['Pace','How long each clip stays on screen. One bar is 4 beats.',[
-  Sel('shotBars','Typical shot length (bars)',[1,2,4,8,16],4,'The normal time a clip stays before the mix moves on. 1 bar is fast, 4 bars is relaxed, 8–16 bars is very slow and ambient.'),
-  R('follow','Follow the music\'s energy',0,2,.05,.8,'0 = every shot has the typical length. Higher = calm parts get longer shots and intense parts shorter ones (at 1, between half and double the typical length).'),
-  Sel('minBars','Shortest shot (bars)',[1,2,4,8],2,'No shot will ever be shorter than this, apart from a clip that starts exactly on a drop.'),
-  Sel('maxBars','Longest shot (bars)',[2,4,8,16],16,'Upper limit for how long a clip can stay on screen.'),
-  R('irregular','Irregularity',0,1,.05,.25,'Chance that a shot is one step longer or shorter than planned, so the changes do not feel mechanical.'),
-  Chk('accent','Start a new clip on drops',true,'When the music has a big drop, a new clip begins exactly on it, with a faster fade.')]],
- ['Clip sets','Each part of the song gets a small set of similar loops that take turns, like two or three decks being crossfaded.',[
-  Sel('setSize','Loops per section',[1,2,3,4],2,'How many loops share one section of the song. 2 gives a calm A-B-A-B alternation. 3 gives more variation but still one feeling.'),
-  R('styleMatch','Style match',0,1,.05,.7,'How alike the loops in one set must be in colour, brightness, texture and motion. High = a consistent look. Low = more contrast between the loops.'),
-  R('matchEnergy','Match the music\'s intensity',0,1,.05,.6,'How strongly loops are chosen to suit the energy of the music. Busy loops for intense parts, calm loops for quiet parts. 0 ignores it.'),
-  R('variety','Variety',0,1,.05,.4,'Randomness in choosing loops. Low = always the best match. High = more surprising choices, and your 100 loops are spread out more evenly.'),
-  R('secLen','Section length (s)',15,180,5,45,'Roughly how long the music may stay in one scene with the same set of loops. Longer = fewer scene changes. The app follows the real structure of the song.'),
-  Chk('reuseSets','Reuse loops in similar sections',true,'Parts of the song that sound alike (a repeated groove, for example) get the same loops, so the form of the music is recognisable.'),
-  R('evolve','Evolve every (bars)',0,128,4,32,'Every N bars one loop in the current set is quietly swapped for a similar one, so long sections slowly change. 0 = off.'),
-  Chk('clip','Use CLIP (AI image understanding)',false,'Lets an AI model look at your loops and judge how similar they really are (for example two different shots of water). The first time, the model (about 100–150 MB) is downloaded from huggingface.co and cached in your browser. Then it works offline.'),
-  Num('theme','Theme (optional text, English)','For example: dark forest, slow water, neon city. Needs CLIP. Loops that match the text are preferred.'),
-  R('themeWeight','Theme strength',0,1,.05,.5,'How much the theme steers which loops are chosen.'),
-  Num('seed','Seed (empty = random)','The same seed and settings give the same mix. Note the seed shown below the player to repeat a mix you liked.')]],
+  Sel('shotBars','Typical shot length (bars)',[1,2,4,8,16,32],8,'The normal time a clip stays on screen. 4 bars is relaxed, 8 bars is slow (about 16 s at 120 BPM), 16–32 bars is very slow and ambient.'),
+  R('follow','Follow the music\'s energy',0,2,.05,.5,'0 = every shot has the typical length. Higher = calm parts get longer shots and intense parts shorter ones.'),
+  Sel('minBars','Shortest shot (bars)',[1,2,4,8],4,'No shot will be shorter than this (except where a section ends).',1),
+  Sel('maxBars','Longest shot (bars)',[4,8,16,32],32,'Upper limit for how long one clip can stay on screen.',1),
+  R('irregular','Irregularity',0,1,.05,.25,'Chance that a shot is one step longer or shorter than planned, so changes do not feel mechanical.',1),
+  Chk('accent','Start a new clip on drops',true,'When the music has a big drop, a new clip begins exactly on it, with a faster fade (only if that does not make a very short shot).',1)]],
+ ['Clip sets','Each part of the song gets a small set of similar loops that take turns, like two to four decks being crossfaded.',[
+  Sel('setSize','Loops per section',[1,2,3,4],3,'How many loops share one section of the song. 2 gives a calm A-B-A-B. 3–4 gives more variation but still one feeling.'),
+  R('styleMatch','Style match',0,1,.05,.7,'How alike the loops in one set must be in colour, brightness, texture and motion. High = a consistent look. Low = more contrast.'),
+  R('variety','Variety',0,1,.05,.6,'Randomness when choosing loops. Low = always the best match. High = more surprising choices.'),
+  Chk('useAll','Use every loop',true,'Tries to show all your loops at least once, by giving the ones not yet used priority and adding them as short layers on top of longer shots. The queue shows how many were used.'),
+  Chk('clip','Use CLIP (AI image understanding)',false,'Lets an AI model look at your loops and judge how similar they really are. The first time, a model (about 100–150 MB) is downloaded from huggingface.co and cached in your browser. After that it works offline.'),
+  Num('theme','Theme (optional, English)','For example: dark forest, slow water, neon city. Needs CLIP. Loops that match the text are preferred.'),
+  R('matchEnergy','Match the music\'s intensity',0,1,.05,.6,'How strongly loops are chosen to suit the energy of the music. 0 ignores it.',1),
+  R('secLen','Section length (s)',15,180,5,45,'Roughly how long the music may stay in one scene with the same set of loops. Longer = fewer scene changes.',1),
+  Chk('reuseSets','Reuse loops in similar sections',true,'Parts of the song that sound alike get the same loops, so the form of the music is recognisable. Turn off to give every section its own loops.',1),
+  R('evolve','Evolve every (bars)',0,128,4,32,'Every N bars one loop in the current set is swapped for a similar one, so long sections slowly change. 0 = off.',1),
+  R('themeWeight','Theme strength',0,1,.05,.5,'How much the theme steers which loops are chosen.',1),
+  Num('seed','Seed (empty = random)','The same seed and settings give the same mix. The seed of every job is shown in the queue.',1)]],
+ ['Layers & looks','Inspired by VJ software: a second clip is blended on top for a while, and each part of the song gets its own colour tint.',[
+  R('layerDensity','Layers',0,1,.05,.5,'How often a second clip is blended on top of the main one. 0 = never. Layers are also how "Use every loop" fits all loops in.'),
+  R('lookVar','Look variation',0,1,.05,.4,'How different each part of the song looks (colour tint, blend style). 0 = the same look everywhere.'),
+  R('layerOpacity','Layer opacity',.1,1,.05,.5,'How visible the blended layer is.',1),
+  Sel('layerBlend','Layer blend mode',['auto','screen','add','overlay','soft-light','lighten','difference'],'auto','How layers mix with the picture. Screen and add make dark areas see-through, overlay and soft-light add texture, difference is wild. Auto picks a soft one per section.',1),
+  R('layerLen','Layer length',.2,1,.05,.6,'How long each layer stays, relative to a normal one.',1),
+  R('tintAmount','Colour tint',0,.4,.01,.12,'Strength of the colour tint of each section (needs Look variation above 0).',1),
+  Sel('mirror','Mirror',['off','sometimes','always'],'off','Mirrors the left half of the picture to the right in some sections (kaleidoscope-like).',1),
+  R('trails','Echo trails',0,.8,.05,0,'Leaves soft trails behind moving things by blending frames. 0 = off.',1),
+  R('reactive','Music reactivity',0,1,.05,.5,'How much layers, tint and breathing swell with the loudness of the music. 0 = constant.',1),
+  R('slowmo','Slow motion in calm parts',0,1,.05,.3,'Plays loops slower when the music is calm (down to half speed). 0 = always normal speed.',1)]],
  ['Transitions','',[
-  R('fade','Crossfade length (beats)',0,16,.5,4,'How softly one clip melts into the next. The fade is centred on the bar line. 0 = hard cut. Breaks and calm parts get fades up to 1.5 times longer.')]],
- ['Motion & effects','All of these are gentle by default and can be switched off with 0.',[
+  R('fade','Crossfade length (beats)',0,32,.5,8,'How softly one clip melts into the next. The fade is centred on the bar line. 0 = hard cut. Breaks and calm parts get fades up to 1.5 times longer.')]],
+ ['Motion & effects','Gentle by default. Set to 0 to switch off.',[
   R('breathe','Breathing zoom',0,.1,.005,.03,'A slow, constant zoom in and out, like the picture is breathing. 0.03 = 3 %.'),
-  R('breathBars','Breathing cycle (bars)',4,64,4,16,'How long one in-and-out breath takes.'),
-  R('zoom','Beat zoom',0,.12,.005,0,'A short zoom pulse on every beat, bar or kick (see next setting). 0.03 is subtle.'),
-  Sel('zoomOn','Zoom on',ON,'bar','Beat = every beat, bar = the first beat of each bar, kick = detected bass drums.'),
-  R('shake','Shake',0,.03,.001,0,'A quick camera shake on each trigger. 0.005 is subtle.'),
-  Sel('shakeOn','Shake on',ON,'kick',''),
-  R('pulse','Brightness pulse',0,.3,.01,0,'Picture flashes lighter or darker on each trigger. 0.05 is subtle.'),
-  Sel('pulseOn','Pulse on',ON,'kick',''),
-  Sel('pulseMode','Pulse type',['light','dark'],'light','Light = flash brighter, dark = dip darker.')]],
- ['Output & playback','',[
-  Sel('res','Picture size',['1280x720','1920x1080','2560x1440','3840x2160','1080x1920'],'1920x1080','Larger is sharper but needs a stronger computer. 1920x1080 is good for jamming on a projector.'),
-  Sel('fps','Recording frame rate',[24,30,60],30,'Only used when recording to a file.'),
-  Sel('bitrate','Recording quality (Mbit/s)',[4,8,16,32],8,'Higher = better picture and a larger file. 8 Mbit/s is about 600 MB for 10 minutes.'),
-  R('sync','Sync offset (ms)',-200,200,5,0,'If the picture feels slightly early or late compared with the music, shift it here.'),
-  Chk('loop','Repeat the track',false,'Keeps playing the track again and again without a gap, which is handy when you jam over it.'),
-  Chk('newMix','New mix on every repeat',true,'When repeating, build a fresh mix each round (new sets and cuts) so it does not feel repeated.')]]];
-const PRE={Ambient:{shotBars:8,follow:.5,minBars:4,maxBars:16,setSize:2,fade:8,breathe:.04,zoom:0,shake:0,pulse:0},
- Chill:{shotBars:4,follow:.8,minBars:2,maxBars:16,setSize:2,fade:4,breathe:.03,zoom:0,shake:0,pulse:0},
- Groove:{shotBars:2,follow:1,minBars:1,maxBars:8,setSize:3,fade:2,breathe:.02,zoom:.02,zoomOn:'bar',shake:0,pulse:.05,pulseOn:'kick'},
- Energetic:{shotBars:1,follow:1.2,minBars:1,maxBars:4,setSize:3,fade:.5,breathe:0,zoom:.05,zoomOn:'beat',shake:.008,shakeOn:'kick',pulse:.1,pulseOn:'kick'}};
+  R('breathBars','Breathing cycle (bars)',4,64,4,16,'How long one in-and-out breath takes.',1),
+  R('zoom','Beat zoom',0,.12,.005,0,'A short zoom pulse on every beat, bar or kick (see next setting). 0.03 is subtle.',1),
+  Sel('zoomOn','Zoom on',ON,'bar','Beat = every beat, bar = the first beat of each bar, kick = detected bass drums.',1),
+  R('shake','Shake',0,.03,.001,0,'A quick camera shake on each trigger. 0.005 is subtle.',1),
+  Sel('shakeOn','Shake on',ON,'kick','',1),
+  R('pulse','Brightness pulse',0,.3,.01,0,'Picture flashes lighter or darker on each trigger. 0.05 is subtle.',1),
+  Sel('pulseOn','Pulse on',ON,'kick','',1),
+  Sel('pulseMode','Pulse type',['light','dark'],'light','Light = flash brighter, dark = dip darker.',1)]],
+ ['Output','',[
+  Sel('res','Picture size',['1280x720','1920x1080','2560x1440','3840x2160','1080x1920'],'1920x1080','Larger is sharper but needs a stronger computer. If the export stutters, choose a smaller size.'),
+  Sel('bitrate','Quality (Mbit/s)',[4,8,16,32],8,'Higher = better picture and a larger file. 8 Mbit/s is about 600 MB for 10 minutes.'),
+  Sel('fps','Frame rate',[24,30,60],30,'',1),
+  R('sync','Sync offset (ms)',-200,200,5,0,'If the picture feels slightly early or late compared with the music, shift it here.',1)]]];
+const PRE={Ambient:{shotBars:16,follow:.3,minBars:8,maxBars:32,setSize:3,fade:16,layerDensity:.4,lookVar:.3,trails:.3,slowmo:.5,breathe:.04,zoom:0,shake:0,pulse:0},
+ Chill:{shotBars:8,follow:.5,minBars:4,maxBars:32,setSize:3,fade:8,layerDensity:.5,lookVar:.4,trails:0,slowmo:.3,breathe:.03,zoom:0,shake:0,pulse:0},
+ Groove:{shotBars:4,follow:.8,minBars:2,maxBars:16,setSize:3,fade:4,layerDensity:.6,lookVar:.5,trails:0,slowmo:.1,breathe:.02,zoom:.02,zoomOn:'bar',shake:0,pulse:.05,pulseOn:'kick'},
+ Energetic:{shotBars:2,follow:1,minBars:1,maxBars:8,setSize:4,fade:1,layerDensity:.7,lookVar:.7,trails:.15,slowmo:0,breathe:0,zoom:.05,zoomOn:'beat',shake:.008,shakeOn:'kick',pulse:.1,pulseOn:'kick'}};
 const fld=f=>{const id='o_'+f.k,h=f.h?`<div class="h">${f.h}</div>`:'';let c;
  if(f.t=='r')c=`<div class="c"><input id="${id}" type="range" min="${f.min}" max="${f.max}" step="${f.step}" value="${f.v}"><output>${f.v}</output></div>`;
  else if(f.t=='s')c=`<select id="${id}">${f.op.map(x=>`<option ${x==f.v?'selected':''}>${x}</option>`).join('')}</select>`;
@@ -212,132 +247,192 @@ const fld=f=>{const id='o_'+f.k,h=f.h?`<div class="h">${f.h}</div>`:'';let c;
  else c=`<input id="${id}" type="${f.k=='seed'?'number':'text'}">`;
  return `<div class="f"><label for="${id}">${f.l}</label>${c}${h}</div>`};
 const $=s=>document.querySelector(s);
-$('#groups').innerHTML=DEFS.map(([g,intro,fs],i)=>`<details ${i<3?'open':''}><summary>${g}</summary>${g=='Pace'||g=='Transitions'?'<div class="pace" id="pace'+g[0]+'"></div>':''}${intro?`<div class="intro">${intro}</div>`:''}<div class="fields">${fs.map(fld).join('')}</div></details>`).join('');
+$('#groups').innerHTML=DEFS.map(([g,intro,fs],i)=>{const m=fs.filter(f=>!f.adv),a=fs.filter(f=>f.adv);
+ return `<details ${i<3?'open':''}><summary>${g}</summary>${g=='Pace'||g=='Transitions'?'<div class="pace" id="pace'+g[0]+'"></div>':''}${intro?`<div class="intro">${intro}</div>`:''}<div class="fields">${m.map(fld).join('')}</div>${a.length?`<details class="adv"><summary>Advanced (${a.length})</summary><div class="fields">${a.map(fld).join('')}</div></details>`:''}</details>`}).join('');
 const ALL=DEFS.flatMap(d=>d[2]);
 const setO=(k,v)=>{const e=$('#o_'+k);if(!e)return;if(e.type=='checkbox')e.checked=!!v;else{e.value=v;if(e.type=='range')e.nextElementSibling.textContent=v}};
 const getO=()=>{const o={};ALL.forEach(f=>{const e=$('#o_'+f.k);o[f.k]=f.t=='c'?e.checked:(e.value!==''&&!isNaN(+e.value)&&f.k!='theme'?+e.value:e.value)});return o};
-const paceTxt=()=>{const o=getO(),bpm=A?A.tempo:120,beat=60/bpm,s=`At ${bpm.toFixed(0)} BPM${A?'':' (assumed until the music is analysed)'}: a typical shot lasts about ${(o.shotBars*4*beat).toFixed(0)} s, and each crossfade about ${(o.fade*beat).toFixed(1)} s.`;
- $('#paceP').textContent=s;$('#paceT').textContent=s};
+let curA=null;
+const paceTxt=()=>{const o=getO(),bpm=curA?curA.tempo:120,beat=60/bpm,s=`At ${bpm.toFixed(0)} BPM${curA?'':' (assumed until the music is analysed)'}: a typical shot lasts about ${(o.shotBars*4*beat).toFixed(0)} s, and each crossfade about ${(o.fade*beat).toFixed(1)} s.`;$('#paceP').textContent=s;$('#paceT').textContent=s};
 $('#groups').addEventListener('input',e=>{if(e.target.type=='range')e.target.nextElementSibling.textContent=e.target.value;document.querySelectorAll('#pre button').forEach(x=>x.classList.remove('on'));$('#pmsg').textContent='';paceTxt()});
 $('#pre').innerHTML=Object.keys(PRE).map(n=>`<button class="sm" data-p="${n}">${n}</button>`).join(' ');
 $('#pre').onclick=e=>{const b=e.target.closest('[data-p]');if(!b)return;Object.entries(PRE[b.dataset.p]).forEach(([k,v])=>setO(k,v));
  document.querySelectorAll('#pre button').forEach(x=>x.classList.toggle('on',x===b));$('#pmsg').textContent=` ${b.dataset.p} is set. You can still adjust everything below.`;paceTxt()};
 
 /* ---------------- files ---------------- */
-let audio=null,lib=[],pick=[],Lp=null,S=null,A=null,AC=null,run=null,clipM=null;
-const MAXL=100,isVid=f=>/^video\//.test(f.type)||/\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name);
+let audio=null,lib=[],pick=[];
+const MAXL=100,isVid=f=>/^video\//.test(f.type)||/\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name),fkey=f=>f.name+'|'+f.size+'|'+f.lastModified;
 const st=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':'mute'};
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function drawPick(){const sh=lib.slice().sort(()=>Math.random()-.5);pick=sh.slice(0,MAXL);Lp=null;S=null;$('#thumbs').innerHTML='';
- $('#vc').textContent=lib.length?`(${pick.length} selected${lib.length>MAXL?' of '+lib.length+' found; the app uses up to 100 per mix':''})`:'';$('#redraw').disabled=lib.length<=MAXL;$('#anaL').disabled=!lib.length}
-function addFiles(fs){const have=new Set(lib.map(f=>f.name+f.size+f.lastModified));[...fs].filter(isVid).forEach(f=>{const k=f.name+f.size+f.lastModified;if(!have.has(k)){have.add(k);lib.push(f)}});drawPick()}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),fmtT=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function drawPick(){pick=lib.slice().sort(()=>Math.random()-.5).slice(0,MAXL);$('#thumbs').innerHTML='';
+ $('#vc').textContent=lib.length?`(${pick.length} selected${lib.length>MAXL?' of '+lib.length+' found; up to 100 are used per mix':''})`:'';$('#redraw').disabled=lib.length<=MAXL;$('#anaL').disabled=!lib.length}
+function addFiles(fs){const have=new Set(lib.map(fkey));[...fs].filter(isVid).forEach(f=>{if(!have.has(fkey(f))){have.add(fkey(f));lib.push(f)}});drawPick()}
 async function walk(en,out){if(en.isFile)await new Promise(r=>en.file(f=>{out.push(f);r()},r));else if(en.isDirectory){const rd=en.createReader();for(;;){const es=await new Promise(r=>rd.readEntries(r,()=>r([])));if(!es.length)break;for(const x of es)await walk(x,out)}}}
 const zone=(id,fn)=>{const z=$(id);z.ondragover=e=>{e.preventDefault();z.classList.add('over')};z.ondragleave=()=>z.classList.remove('over');z.ondrop=async e=>{e.preventDefault();z.classList.remove('over');await fn(e.dataTransfer)}};
-zone('#dA',dt=>{audio=dt.files[0];$('#an').textContent=audio?audio.name:'';A=null});
-zone('#dV',async dt=>{const out=[];const its=[...dt.items].map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);if(its.length){for(const en of its)await walk(en,out)}else out.push(...dt.files);addFiles(out)});
+const setAudio=f=>{audio=f||null;$('#an').textContent=f?f.name:'No file chosen';if(f&&!$('#jname').value)$('#jname').placeholder=f.name.replace(/\.[^.]+$/,'')};
+zone('#dA',dt=>setAudio(dt.files[0]));
+zone('#dV',async dt=>{const out=[],its=[...dt.items].map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);if(its.length){for(const en of its)await walk(en,out)}else out.push(...dt.files);addFiles(out)});
 $('#bA').onclick=()=>$('#fA').click();$('#bV').onclick=()=>$('#fV').click();$('#bD').onclick=()=>$('#fD').click();
-$('#fA').onchange=e=>{audio=e.target.files[0];$('#an').textContent=audio?audio.name:'';A=null;paceTxt()};
-$('#fV').onchange=e=>{addFiles(e.target.files);e.target.value=''};$('#fD').onchange=e=>{addFiles(e.target.files);e.target.value=''};
-$('#redraw').onclick=drawPick;$('#anaL').onclick=()=>prepareLoops(getO()).catch(e=>st(e.message,1));
+$('#fA').onchange=e=>setAudio(e.target.files[0]);$('#fV').onchange=e=>{addFiles(e.target.files);e.target.value=''};$('#fD').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+$('#redraw').onclick=drawPick;
 
 /* ---------------- loop analysis (and optional CLIP) ---------------- */
-const seek=(v,t)=>new Promise(r=>{const f=()=>{v.removeEventListener('seeked',f);r()};v.addEventListener('seeked',f);v.currentTime=t});
+const seek=(v,t)=>new Promise(r=>{const f=()=>{v.removeEventListener('seeked',f);r()};v.addEventListener('seeked',f);v.currentTime=Math.min(t,v.duration-.05)});
 function hue(r,g,b){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;if(d<.08)return -1;let h=mx==r?((g-b)/d)%6:mx==g?(b-r)/d+2:(r-g)/d+4;return((h*60+360)%360)/60|0}
 async function analyzeLoop(f,vid,wantFrames){
  const url=URL.createObjectURL(f);vid.src=url;
- try{await Promise.race([new Promise((r,j)=>{vid.onloadedmetadata=r;vid.onerror=()=>j(new Error('unreadable'))}),sleep(20000).then(()=>{throw new Error('timeout')})]);
-  const dur=vid.duration,n=clamp(Math.round(dur*2),8,24),c=document.createElement('canvas');c.width=64;c.height=36;const g=c.getContext('2d',{willReadFrequently:true}),
-   c2=document.createElement('canvas');c2.width=c2.height=224;const g2=c2.getContext('2d',{willReadFrequently:true}),mot=[],acc=new Float64Array(13),frames=[];let prev=null,thumb='';
-  for(let i=0;i<n;i++){await seek(vid,dur*(i+.5)/n);g.drawImage(vid,0,0,64,36);const d=g.getImageData(0,0,64,36).data,gr=new Float32Array(2304);let R=0,G=0,B=0,sa=0,lu=0,lu2=0,ed=0;
+ try{await Promise.race([new Promise((r,j)=>{vid.onloadedmetadata=r;vid.onerror=()=>j(new Error('unreadable'))}),sleep(30000).then(()=>{throw new Error('timeout')})]);
+  const dur=vid.duration,n=clamp(Math.round(dur/6),6,16),dtp=Math.min(.3,dur/(n*3)),c=document.createElement('canvas');c.width=64;c.height=36;const g=c.getContext('2d',{willReadFrequently:true}),
+   c2=document.createElement('canvas');c2.width=c2.height=224;const g2=c2.getContext('2d',{willReadFrequently:true}),mot=[],acc=new Float64Array(13),frames=[];let thumb='';
+  for(let i=0;i<n;i++){const t=dur*(i+.5)/n;await seek(vid,t);g.drawImage(vid,0,0,64,36);const d=g.getImageData(0,0,64,36).data,gr=new Float32Array(2304);let R=0,G=0,B=0,sa=0,lu=0,lu2=0,ed=0;
    for(let p=0;p<2304;p++){const r=d[p*4]/255,gg=d[p*4+1]/255,b=d[p*4+2]/255,l=.3*r+.59*gg+.11*b;gr[p]=l;R+=r;G+=gg;B+=b;lu+=l;lu2+=l*l;const mx=Math.max(r,gg,b),mn=Math.min(r,gg,b);sa+=mx?(mx-mn)/mx:0;
     if(p%64)ed+=Math.abs(l-gr[p-1]);const h=hue(r,gg,b);if(h>=0)acc[7+h]+=mx-mn}
-   let m=0;if(prev)for(let p=0;p<2304;p++)m+=Math.abs(gr[p]-prev[p]);mot.push(prev?m/2304:0);prev=gr;
    acc[0]+=R/2304/n;acc[1]+=G/2304/n;acc[2]+=B/2304/n;acc[3]+=sa/2304/n;acc[4]+=lu/2304/n;acc[5]+=Math.sqrt(Math.max(0,lu2/2304-(lu/2304)**2))/n;acc[6]+=ed/2304/n;
    if(i==Math.floor(n/2))thumb=c.toDataURL('image/jpeg',.6);
-   if(wantFrames&&[.15,.5,.85].some(q=>i==Math.round(q*(n-1)))){g2.drawImage(vid,0,0,224,224);frames.push(g2.getImageData(0,0,224,224))}}
-  mot[0]=mot[1]??0;const hs=acc.slice(7,13).reduce((a,b)=>a+b,0)||1,mm=mean(mot,0,mot.length),ms=Math.sqrt(mean(mot.map(x=>(x-mm)**2),0,mot.length));
-  const v=[...acc.slice(0,7),...Array.from(acc.slice(7,13),x=>x/hs),mm,ms];
-  return{file:f,name:f.name,dur,mm,v,thumb,frames};
+   if(wantFrames&&[.15,.5,.85].some(q=>i==Math.round(q*(n-1)))){g2.drawImage(vid,0,0,224,224);frames.push(g2.getImageData(0,0,224,224))}
+   await seek(vid,t+dtp);g.drawImage(vid,0,0,64,36);const d2=g.getImageData(0,0,64,36).data;let m=0;for(let p=0;p<2304;p++)m+=Math.abs((.3*d2[p*4]+.59*d2[p*4+1]+.11*d2[p*4+2])/255-gr[p]);mot.push(m/2304)}
+  const hs=acc.slice(7,13).reduce((a,b)=>a+b,0)||1,mm=mean(mot,0,mot.length),ms=Math.sqrt(mean(mot.map(x=>(x-mm)**2),0,mot.length));
+  return{file:f,name:f.name,dur,mm,v:[...acc.slice(0,7),...Array.from(acc.slice(7,13),x=>x/hs),mm,ms],thumb,frames};
  }finally{URL.revokeObjectURL(url)}
 }
-async function loadClip(){
- if(clipM)return clipM;st('Loading the CLIP model (first time: about 100–150 MB download)…');
+let clipM=null;
+async function loadClip(msg){
+ if(clipM)return clipM;msg('Loading the CLIP model (first time: about 100–150 MB download)…');
  const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');const id='Xenova/clip-vit-base-patch32';let dev={};
  try{if(navigator.gpu&&(await navigator.gpu.requestAdapter()))dev={device:'webgpu'}}catch(e){}
  const mk=async o=>({proc:await T.AutoProcessor.from_pretrained(id),vis:await T.CLIPVisionModelWithProjection.from_pretrained(id,o),tok:await T.AutoTokenizer.from_pretrained(id),txt:await T.CLIPTextModelWithProjection.from_pretrained(id,o)});
  let m;try{m=await mk(dev)}catch(e){m=await mk({})}
  const norm=a=>{const n=Math.hypot(...a)||1;return Array.from(a,x=>x/n)};
- return clipM={T,norm,
-  async img(frames){const acc=new Float64Array(512);for(const fr of frames){const im=new T.RawImage(fr.data,fr.width,fr.height,4).rgb();const {image_embeds}=await m.vis(await m.proc(im));const e=norm(image_embeds.data);e.forEach((x,i)=>acc[i]+=x)}return norm(acc)},
+ return clipM={norm,
+  async img(frames){const acc=new Float64Array(512);for(const fr of frames){const im=new T.RawImage(fr.data,fr.width,fr.height,4).rgb();const {image_embeds}=await m.vis(await m.proc(im));norm(image_embeds.data).forEach((x,i)=>acc[i]+=x)}return norm(acc)},
   async txt(s){const {text_embeds}=await m.txt(m.tok([s],{padding:true,truncation:true}));return norm(text_embeds.data)}};
 }
-async function prepareLoops(o){
- if(!pick.length)throw new Error('Add some video loops first.');if(Lp)return;
- const vids=[0,1,2].map(()=>{const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';v.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';document.body.append(v);return v});
- const res=new Array(pick.length);let next=0,done=0,bad=0;
- await Promise.all(vids.map(async v=>{for(;;){const i=next++;if(i>=pick.length)break;try{res[i]=await analyzeLoop(pick[i],v,o.clip)}catch(e){bad++}st(`Analyzing loops ${++done}/${pick.length}…`)}}));
- vids.forEach(v=>v.remove());const L=res.filter(Boolean);if(!L.length)throw new Error('None of the videos could be read by this browser (try H.264 mp4).');
- if(o.clip){const C=await loadClip();let k=0;for(const l of L){st(`CLIP: looking at loop ${++k}/${L.length}…`);l.emb=await C.img(l.frames);delete l.frames}
+const loopCache=new Map();
+async function loopsFor(files,o,msg){
+ const need=files.filter(f=>{const c=loopCache.get(fkey(f));return !c||(o.clip&&!c.bad&&!c.emb)});
+ if(need.length){const vids=[0,1,2].map(()=>{const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';v.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';document.body.append(v);return v});
+  let next=0,done=0;await Promise.all(vids.map(async v=>{for(;;){const i=next++;if(i>=need.length)break;const f=need[i];try{loopCache.set(fkey(f),await analyzeLoop(f,v,o.clip))}catch(e){loopCache.set(fkey(f),{bad:true,name:f.name})}msg(`Analyzing loops ${++done}/${need.length}…`)}}));vids.forEach(v=>v.remove())}
+ const L=files.map(f=>loopCache.get(fkey(f))).filter(c=>c&&!c.bad),bad=files.length-L.length;
+ if(!L.length)throw new Error('None of the videos could be read by this browser (try H.264 mp4).');
+ L.forEach(l=>{l.theme=null});
+ if(o.clip){const C=await loadClip(msg);let k=0;for(const l of L)if(!l.emb){msg(`CLIP: looking at loop ${++k}/${L.length}…`);l.emb=await C.img(l.frames);l.frames=[]}
   if(o.theme.trim()){const t=await C.txt(o.theme.trim());L.forEach(l=>l.theme=l.emb.reduce((s,x,i)=>s+x*t[i],0))}}
- S=normLoops(L,o.clip?.7:0);Lp=L;
- $('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');
- st(`${L.length} loops analyzed${bad?` (${bad} could not be read)`:''}.`);
+ return{L,bad};
 }
-function drawTL(slots){const c=$('#tl'),g=c.getContext('2d'),W=c.width,H=c.height;g.clearRect(0,0,W,H);
- slots.forEach(s=>{g.fillStyle=`hsl(${s.loop*47%360} 65% 55%)`;g.fillRect(s.t0/A.dur*W,H/2,Math.max(1,(s.t1-s.t0)/A.dur*W-1),H/2-2)});
- g.strokeStyle=getComputedStyle(document.body).color;g.beginPath();A.energy.forEach((e,i)=>{const x=A.bt[i]/A.dur*W,y=H/2-4-e*(H/2-8);i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();
- g.fillStyle='#ff3d81';A.drops.forEach(d=>g.fillRect(A.bt[d]/A.dur*W-1,0,2,H));g.fillStyle=g.strokeStyle;A.sections.forEach(([a])=>g.fillRect(A.bt[a]/A.dur*W,0,1,H/2))}
+$('#anaL').onclick=async()=>{try{const o=getO(),{L,bad}=await loopsFor(pick,o,st);$('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');st(`${L.length} loops analyzed${bad?` (${bad} could not be read)`:''}.`)}catch(e){st(e.message,1)}};
 
-/* ---------------- playback (a few video elements, swapped as needed) ---------------- */
-const POOL=8,LOOK=15,pool=[];
+/* ---------------- recording helpers ---------------- */
+const MIMES=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+const MIME=window.MediaRecorder?MIMES.find(t=>MediaRecorder.isTypeSupported(t))||'':'',EXT=MIME.includes('mp4')?'mp4':'webm';
+$('#fmt').innerHTML=!MIME?'<span class="note">This browser cannot record video. Use Chrome, Edge or Safari.</span>':EXT=='mp4'?'Export format: <b>MP4 (H.264)</b>.':
+ '<span class="note">This browser can only record <b>WebM</b>, not MP4. Chrome or Edge on Windows/macOS and Safari can export MP4 directly. To convert a WebM file, run: <code>ffmpeg -i mix.webm -c:v libx264 -crf 18 -c:a aac mix.mp4</code></span>';
+async function openSink(name){let w=null,root=null,fh=null;try{root=await navigator.storage.getDirectory();fh=await root.getFileHandle(name,{create:true});w=await fh.createWritable()}catch(e){w=null}
+ const mem=[];let p=Promise.resolve();
+ return{write(b){p=p.then(()=>w?w.write(b):void mem.push(b))},async close(){await p;if(w){await w.close();return fh.getFile()}return new Blob(mem,{type:MIME})},async remove(){try{root&&await root.removeEntry(name)}catch(e){}}}}
+const tickW=new Worker(URL.createObjectURL(new Blob(['let id;onmessage=e=>{clearInterval(id);if(e.data)id=setInterval(()=>postMessage(0),1000/e.data)}'])));
+
+/* ---------------- renderer (offscreen canvas, no preview, real time) ---------------- */
+const POOL=10,LOOK=20,pool=[];
+function mkPool(){if(pool.length)return;for(let i=0;i<POOL;i++){const el=document.createElement('video');el.muted=true;el.loop=true;el.playsInline=true;el.preload='auto';el.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';document.body.append(el);pool.push({el,loop:-1,url:'',t:0})}}
 const holder=l=>pool.find(p=>p.loop===l);
-function acquire(l,need,m){const p=pool.find(p=>p.loop===-1)||pool.filter(p=>!need.has(p.loop)).sort((a,b)=>a.t-b.t)[0];if(!p)return;
- if(p.url)URL.revokeObjectURL(p.url);p.loop=l;p.t=m;p.url=URL.createObjectURL(Lp[l].file);const el=p.el;
+function acquire(L,l,need,m){const p=pool.find(p=>p.loop===-1)||pool.filter(p=>!need.has(p.loop)).sort((a,b)=>a.t-b.t)[0];if(!p)return;
+ if(p.url)URL.revokeObjectURL(p.url);p.loop=l;p.t=m;p.url=URL.createObjectURL(L[l].file);const el=p.el;
  el.addEventListener('loadedmetadata',()=>{el.currentTime=Math.random()*el.duration;el.play().catch(()=>{})},{once:true});el.src=p.url;el.load()}
 const trig=(A,mode)=>mode=='kick'?A.kicks.map((t,i)=>({t,w:.5+.5*A.kstr[i]})):A.bt.slice(1,-1).map((t,i)=>({t,i:i+1})).filter(x=>mode=='beat'||((x.i-A.phase)%4+4)%4==0).map(x=>({t:x.t,w:1}));
 const env=(a,m,d)=>{let lo=0,hi=a.length-1,r=-1;while(lo<=hi){const k=(lo+hi)>>1;if(a[k].t<=m){r=k;lo=k+1}else hi=k-1}return r<0?0:a[r].w*Math.exp(-d*(m-a[r].t))};
-const ease=x=>x*x*(3-2*x);
-async function play(){
- if(run)return;const o=getO();let wr=null,mt='';
- if($('#rec').checked){mt=['video/mp4;codecs=avc1','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
-  if(window.showSaveFilePicker){try{wr=await (await showSaveFilePicker({suggestedName:'munken-loops.'+(mt.includes('mp4')?'mp4':'webm')})).createWritable()}catch(e){if(e.name=='AbortError')return}}}
- try{if(!audio)throw new Error('Choose a music file first.');
-  AC??=new AudioContext();await AC.resume();
-  if(!A||A.secLen!=o.secLen){st('Decoding the music…');const ab=A?.buf||await AC.decodeAudioData(await audio.arrayBuffer());A=await analyzeAudio(ab,o.secLen,st);A.buf=ab;A.secLen=o.secLen}
-  paceTxt();await prepareLoops(o)}catch(e){st(e.message,1);return}
- if(!pool.length)for(let i=0;i<POOL;i++){const el=document.createElement('video');el.muted=true;el.loop=true;el.playsInline=true;el.preload='auto';el.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';document.body.append(el);pool.push({el,loop:-1,url:'',t:0})}
- pool.forEach(p=>{p.loop=-1;p.el.pause()});
- let seed=o.seed!==''?+o.seed:Math.floor(Math.random()*1e9),slots=plan(A,Lp,S,o,mkrng(seed)),ta=slots.map(s=>s.t0-s.xf/2);drawTL(slots);
- const info=()=>st(`${A.tempo.toFixed(1)} BPM · ${slots.length} shots · ${A.sections.length} sections · ${Lp.length} loops available · seed ${seed}`);info();
- const [W,H]=o.res.split('x').map(Number),cv=$('#stage');cv.width=W;cv.height=H;const g=cv.getContext('2d'),T={zoom:trig(A,o.zoomOn),shake:trig(A,o.shakeOn),pulse:trig(A,o.pulseOn)},
-  t0=clamp(+$('#t0').value||0,0,A.dur-1),beatS=60/A.tempo,src=AC.createBufferSource(),dest=AC.createMediaStreamDestination();src.buffer=A.buf;src.loop=o.loop;src.connect(AC.destination);src.connect(dest);
- const findK=m=>{let lo=0,hi=slots.length-1,r=0;while(lo<=hi){const k=(lo+hi)>>1;if(ta[k]<=m){r=k;lo=k+1}else hi=k-1}return r};
- const ensure=(m,k)=>{const need=new Set();for(let j=Math.max(0,k-1);j<slots.length&&ta[j]<m+LOOK;j++)need.add(slots[j].loop);need.forEach(l=>{const h=holder(l);if(h)h.t=m;else acquire(l,need,m)});return need};
- let k0=findK(t0);st('Loading the first clips…');for(let i=0;i<50;i++){ensure(t0,k0);const h=holder(slots[k0].loop);if(h&&h.el.readyState>=2)break;await sleep(100)}info();
- let rec=null,chunks=[];
- if(mt){const ms=new MediaStream([...cv.captureStream(o.fps).getVideoTracks(),...dest.stream.getAudioTracks()]);rec=new MediaRecorder(ms,{mimeType:mt,videoBitsPerSecond:o.bitrate*1e6});
-  rec.ondataavailable=e=>{if(e.data.size)wr?wr.write(e.data):chunks.push(e.data)};
-  rec.onstop=async()=>{if(wr){await wr.close();$('#out').innerHTML='<p>Recording saved to the file you chose.</p>'}else{const b=new Blob(chunks,{type:rec.mimeType}),u=URL.createObjectURL(b),ext=rec.mimeType.includes('mp4')?'mp4':'webm';
-   $('#out').innerHTML=`<p><a href="${u}" download="munken-loops.${ext}"><button>Download ${ext} (${(b.size/1e6).toFixed(0)} MB)</button></a></p><video src="${u}" controls style="width:100%;border-radius:10px"></video>`}};rec.start(1000)}
- const tS=AC.currentTime+.2;src.start(tS,t0);let pass=0;
- run={stop:()=>{cancelAnimationFrame(run.raf);try{src.stop()}catch(e){}pool.forEach(p=>p.el.pause());rec&&rec.state!='inactive'&&rec.stop();run=null;$('#play').disabled=false;$('#stop').disabled=true}};
- $('#play').disabled=true;$('#stop').disabled=false;
- const drawV=(el,z,dx,dy,a)=>{if(!el||el.readyState<2||!el.videoWidth)return;g.globalAlpha=a;g.save();g.translate(W/2+dx,H/2+dy);g.scale(z,z);const s=Math.max(W/el.videoWidth,H/el.videoHeight);
-  g.drawImage(el,-el.videoWidth*s/2,-el.videoHeight*s/2,el.videoWidth*s,el.videoHeight*s);g.restore();g.globalAlpha=1};
- const frame=()=>{const tot=AC.currentTime-tS+t0+o.sync/1000;if(!o.loop&&tot>=A.dur){run.stop();return}
-  const ps=Math.floor(tot/A.dur),m=tot-ps*A.dur;
-  if(ps!=pass){pass=ps;if(o.newMix){seed=Math.floor(Math.random()*1e9);slots=plan(A,Lp,S,o,mkrng(seed));ta=slots.map(s=>s.t0-s.xf/2);drawTL(slots);info()}}
-  const k=findK(m);ensure(m,k);const s=slots[k],since=m-ta[k],bo=s.kind=='drop'?1.6:1,
-   z=1+o.breathe*(.5-.5*Math.cos(2*Math.PI*m/(o.breathBars*4*beatS)))+2*o.shake+o.zoom*bo*env(T.zoom,m,7),sh=env(T.shake,m,14)*o.shake,dx=sh*W*Math.sin(m*610),dy=sh*H*Math.sin(m*470);
-  g.fillStyle='#000';g.fillRect(0,0,W,H);
-  if(k>0&&s.xf>0&&since<s.xf){drawV(holder(slots[k-1].loop)?.el,z,dx,dy,1);drawV(holder(s.loop)?.el,z,dx,dy,ease(since/s.xf))}else drawV(holder(s.loop)?.el,z,dx,dy,1);
-  const pu=o.pulse*bo*env(T.pulse,m,10);if(pu>.002){g.fillStyle=o.pulseMode=='light'?`rgba(255,255,255,${pu})`:`rgba(0,0,0,${pu*2})`;g.fillRect(0,0,W,H)}
-  run.raf=requestAnimationFrame(frame)};
- run.raf=requestAnimationFrame(frame);
+const ease=x=>x*x*(3-2*x),CM={add:'lighter'};
+
+function renderJob(j,A,L,P){
+ return new Promise(async resolve=>{
+  const o=j.o,{slots,layers,looks}=P,[W,H]=o.res.split('x').map(Number),cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d',{alpha:false});g.fillStyle='#000';g.fillRect(0,0,W,H);
+  const ta=slots.map(s=>s.t0-s.xf/2),T={zoom:trig(A,o.zoomOn),shake:trig(A,o.shakeOn),pulse:trig(A,o.pulseOn)},beatS=60/A.tempo;
+  mkPool();pool.forEach(p=>{p.loop=-1;p.el.pause()});
+  const findK=m=>{let lo=0,hi=slots.length-1,r=0;while(lo<=hi){const k=(lo+hi)>>1;if(ta[k]<=m){r=k;lo=k+1}else hi=k-1}return r};
+  const eAt=m=>{let lo=0,hi=A.nb-1;while(lo<hi){const k=(lo+hi+1)>>1;if(A.bt[k]<=m)lo=k;else hi=k-1}return A.energy[lo]};
+  const ensure=(m,k)=>{const need=new Set();for(let i=Math.max(0,k-1);i<slots.length&&ta[i]<m+LOOK;i++)need.add(slots[i].loop);layers.forEach(l=>{if(l.t0-l.fade<m+LOOK&&l.t1>m-1)need.add(l.loop)});
+   need.forEach(l=>{const h=holder(l);if(h)h.t=m;else acquire(L,l,need,m)})};
+  const visible=(m,k)=>{const v=new Set([slots[k].loop]);if(k>0&&m-ta[k]<slots[k].xf)v.add(slots[k-1].loop);if(k+1<slots.length&&ta[k+1]-m<2.5)v.add(slots[k+1].loop);layers.forEach(l=>{if(l.t0-l.fade-2.5<m&&m<l.t1+.2)v.add(l.loop)});return v};
+  j.msg='Loading the first clips…';upd(j);
+  for(let i=0;i<80;i++){ensure(0,0);const h=holder(slots[0].loop);if(h&&h.el.readyState>=2)break;await sleep(100)}
+  const dest=AC.createMediaStreamDestination(),src=AC.createBufferSource();src.buffer=A.buf;src.connect(dest);
+  const sink=await openSink(`${j.id}-${Date.now()}.${EXT}`);j.sink=sink;
+  const rec=new MediaRecorder(new MediaStream([...cv.captureStream(o.fps).getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:MIME,videoBitsPerSecond:o.bitrate*1e6,audioBitsPerSecond:192000});
+  rec.ondataavailable=e=>{if(e.data.size)sink.write(e.data)};
+  let ended=false;const finish=async why=>{if(ended)return;ended=true;tickW.postMessage(0);try{src.stop()}catch(e){}pool.forEach(p=>p.el.pause());
+   await new Promise(r=>{rec.onstop=r;if(rec.state!='inactive')rec.stop();else r()});const f=await sink.close();j.file=f;j.url=URL.createObjectURL(f);j.status=why;j.prog=why=='done'?1:j.prog;j.msg='';upd(j);if(AC.state=='suspended')AC.resume();resolve()};
+  j.ctl={pause:async()=>{if(j.status!='rendering')return;j.status='paused';await AC.suspend();rec.state=='recording'&&rec.pause();pool.forEach(p=>p.el.pause());upd(j)},
+   resume:async()=>{if(j.status!='paused')return;j.status='rendering';rec.state=='paused'&&rec.resume();await AC.resume();upd(j)},stop:()=>{if(j.status=='paused')AC.resume();finish('stopped')}};
+  const tS=AC.currentTime+.3;src.start(tS);rec.start(1000);j.status='rendering';j.msg='';upd(j);let lastUI=0,lastRate=0,rate=1;
+  tickW.onmessage=()=>{if(ended||j.status!='rendering')return;const m=AC.currentTime-tS+o.sync/1000;if(m<0)return;if(m>=A.dur){finish('done');return}
+   const k=findK(m);ensure(m,k);const s=slots[k],since=m-ta[k],bo=s.kind=='drop'?1.6:1,e=eAt(m),react=1-o.reactive+o.reactive*Math.min(1.4,e*1.6),look=looks[s.cluster],pl=k>0?looks[slots[k-1].cluster]:look,
+    fx=s.xf>0&&since<s.xf?ease(since/s.xf):1;
+   const vis=visible(m,k);for(const p of pool)if(p.loop>=0){const want=vis.has(p.loop);if(want&&p.el.paused&&p.el.readyState>=2)p.el.play().catch(()=>{});else if(!want&&!p.el.paused)p.el.pause()}
+   if(m-lastRate>.4){lastRate=m;rate=clamp(1-o.slowmo*.5*(1-e),.5,1);for(const p of pool)if(p.loop>=0&&vis.has(p.loop)&&Math.abs(p.el.playbackRate-rate)>.02)p.el.playbackRate=rate}
+   const z=1+o.breathe*react*(.5-.5*Math.cos(2*Math.PI*m/(o.breathBars*4*beatS)))+2*o.shake+o.zoom*bo*env(T.zoom,m,7),sh=env(T.shake,m,14)*o.shake,dx=sh*W*Math.sin(m*610),dy=sh*H*Math.sin(m*470),a0=o.trails>0?1-o.trails*.85:1;
+   const dv=(el,al,blend)=>{if(!el||el.readyState<2||!el.videoWidth||al<=.003)return;g.globalAlpha=al;g.globalCompositeOperation=blend||'source-over';g.save();g.translate(W/2+dx,H/2+dy);g.scale(z,z);
+    const sc=Math.max(W/el.videoWidth,H/el.videoHeight);g.drawImage(el,-el.videoWidth*sc/2,-el.videoHeight*sc/2,el.videoWidth*sc,el.videoHeight*sc);g.restore();g.globalAlpha=1;g.globalCompositeOperation='source-over'};
+   if(!(o.trails>0)){g.fillStyle='#000';g.fillRect(0,0,W,H)}
+   if(k>0&&fx<1){dv(holder(slots[k-1].loop)?.el,a0);dv(holder(s.loop)?.el,a0*fx)}else dv(holder(s.loop)?.el,a0);
+   for(const l of layers){if(m<l.t0-l.fade||m>l.t1+l.fade)continue;const x=Math.min(1,(m-(l.t0-l.fade))/l.fade,(l.t1+l.fade-m)/l.fade);dv(holder(l.loop)?.el,l.alpha*ease(Math.max(0,x))*react,CM[l.blend]||l.blend)}
+   if(look.mirror&&fx>.5){g.save();g.translate(W,0);g.scale(-1,1);g.drawImage(cv,0,0,W/2,H,0,0,W/2,H);g.restore()}
+   for(const[lk,w]of[[pl,1-fx],[look,fx]])if(lk.tint>0&&w>.01){g.globalCompositeOperation='soft-light';g.fillStyle=`hsla(${lk.hue},80%,55%,${Math.min(1,lk.tint*react*w)})`;g.fillRect(0,0,W,H);g.globalCompositeOperation='source-over'}
+   const pu=o.pulse*bo*env(T.pulse,m,10);if(pu>.002){g.fillStyle=o.pulseMode=='light'?`rgba(255,255,255,${pu})`:`rgba(0,0,0,${pu*2})`;g.fillRect(0,0,W,H)}
+   j.prog=m/A.dur;const now=performance.now();if(now-lastUI>500){lastUI=now;j.tctx&&j.tctx.drawImage(cv,0,0,192,108);upd(j)}};
+  tickW.postMessage(o.fps);
+ });
 }
-$('#play').onclick=play;$('#stop').onclick=()=>run&&run.stop();$('#fs').onclick=()=>$('#stage').requestFullscreen&&$('#stage').requestFullscreen();
-addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if(e.code=='Space'){e.preventDefault();run?run.stop():play()}if(e.key=='f'||e.key=='F')$('#fs').click()});
-$('#pre').querySelector('[data-p="Chill"]').click();paceTxt();
-if(typeof module!=='undefined')module.exports={analyzeAudio,plan,mkrng,normLoops};
+
+/* ---------------- queue ---------------- */
+let jobs=[],jid=0,cur=null,running=false,AC=null,aCache={};
+const hueOf=i=>`hsl(${i*47%360} 65% 55%)`;
+function drawTL(j,A,P){const c=j.lctx.canvas,g=j.lctx,W=c.width,H=c.height;g.clearRect(0,0,W,H);
+ P.slots.forEach(s=>{g.fillStyle=hueOf(s.loop);g.fillRect(s.t0/A.dur*W,H*.45,Math.max(1,(s.t1-s.t0)/A.dur*W-1),H*.3)});
+ P.layers.forEach(l=>{g.fillStyle=hueOf(l.loop);g.globalAlpha=.8;g.fillRect(l.t0/A.dur*W,H*.78,Math.max(1,(l.t1-l.t0)/A.dur*W),H*.2);g.globalAlpha=1});
+ g.strokeStyle=getComputedStyle(document.body).color;g.beginPath();A.energy.forEach((e,i)=>{const x=A.bt[i]/A.dur*W,y=H*.4-e*H*.36;i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();
+ g.fillStyle='#ff3d81';A.drops.forEach(d=>g.fillRect(A.bt[d]/A.dur*W-1,0,2,H*.4));g.fillStyle=g.strokeStyle;A.sections.forEach(([a])=>g.fillRect(A.bt[a]/A.dur*W,0,1,H*.4))}
+function card(j){const d=document.createElement('div');d.className='job';
+ d.innerHTML=`<div class="jh"><b class="jn"></b><span class="chip"></span></div><div class="mute jm"></div><div class="jb"><canvas class="jt" width="192" height="108"></canvas><div class="jr"><div class="prog"><i></i></div><div class="mute jp"></div><canvas class="jl" width="700" height="44"></canvas><div class="acts"></div><div class="mute jf"></div></div></div>`;
+ j.tctx=d.querySelector('.jt').getContext('2d');j.lctx=d.querySelector('.jl').getContext('2d');j.el=d;d.onclick=e=>{const a=e.target.dataset.a;if(!a)return;
+  if(a=='pause')j.status=='paused'?j.ctl.resume():j.ctl.pause();if(a=='stop'){if(j.ctl&&(j.status=='rendering'||j.status=='paused'))j.ctl.stop();else if(j.status=='waiting'||j.status=='preparing'){j.cancel=true;j.status=j.status=='waiting'?'stopped':j.status;upd(j)}}
+  if(a=='rm')rmJob(j);if(a=='again')addJob(j.audio,j.files,{...j.o,seed:Math.floor(Math.random()*1e9)},j.name.replace(/ #\d+$/,'')+' (again)');if(a=='up'){const i=jobs.indexOf(j);if(i>0&&jobs[i-1].status=='waiting'){[jobs[i-1],jobs[i]]=[jobs[i],jobs[i-1]];order()}}};
+ return d}
+const CH={waiting:'Waiting',preparing:'Preparing',rendering:'Rendering',paused:'Paused',done:'Done',failed:'Failed',stopped:'Stopped'};
+function upd(j){const d=j.el;if(!d)return;const q=s=>d.querySelector(s);q('.jn').textContent=j.name;const ch=q('.chip');ch.textContent=CH[j.status];ch.className='chip '+j.status;
+ q('.jm').textContent=`${j.audio.name} · ${j.files.length} loops · ${j.o.res} · ${j.o.shotBars}-bar shots · seed ${j.o.seed}`+(j.info?' · '+j.info:'');
+ q('.prog i').style.width=Math.round(100*j.prog)+'%';const dur=j.dur||0,live=j.status=='rendering'||j.status=='paused';
+ q('.jp').textContent=j.msg||(dur?`${fmtT(j.prog*dur)} / ${fmtT(dur)}${live?` · about ${fmtT(dur*(1-j.prog))} left`:''}`:(j.status=='waiting'?'In the queue':''));
+ const act=q('.acts'),b=(a,t,m)=>`<button class="sm ${m||''}" data-a="${a}">${t}</button>`;
+ let h='';if(live)h+=b('pause',j.status=='paused'?'Resume':'Pause')+b('stop','Stop (keep what is done)');else if(j.status=='waiting')h+=b('up','Move up')+b('stop','Cancel')+b('rm','Remove');else if(j.status=='preparing')h+=b('stop','Cancel');
+ else{if(j.url)h+=`<a class="btn sm main" href="${j.url}" download="${j.name.replace(/[^\w\-. ]+/g,'_')}.${EXT}">Download ${EXT.toUpperCase()}${j.file?' ('+(j.file.size/1e6).toFixed(0)+' MB)':''}</a>`;h+=b('again','Again, new seed')+b('rm','Remove')}
+ if(act.dataset.h!=h){act.innerHTML=h;act.dataset.h=h}
+ q('.jf').textContent=j.status=='failed'?j.err:(j.status=='stopped'&&j.url?'Stopped early. The part that was rendered can still be downloaded.':'');
+ q('.jt').style.display=live||j.status=='done'||j.status=='stopped'?'':'none';summary()}
+function summary(){const c=s=>jobs.filter(j=>s.includes(j.status)).length,left=jobs.reduce((a,j)=>a+(['waiting','preparing','rendering','paused'].includes(j.status)?(j.dur||0)*(1-(j.prog||0)):0),0);
+ $('#sum').innerHTML=[['Rendering',c(['rendering','paused','preparing'])],['Waiting',c(['waiting'])],['Done',c(['done'])],['Stopped/failed',c(['stopped','failed'])]].map(([n,v])=>`<span class="pill">${n}: <b>${v}</b></span>`).join('')+(left>0?`<span class="pill">About ${fmtT(left)} of rendering left (known so far)</span>`:'');
+ const live=cur&&(cur.status=='rendering'||cur.status=='paused');$('#qpause').disabled=!live;$('#qstop').disabled=!live;$('#qpause').textContent=cur&&cur.status=='paused'?'Resume':'Pause'}
+function order(){const q=$('#queue');if(!jobs.length){q.innerHTML='<p class="mute">The queue is empty.</p>';return}if(q.querySelector('p'))q.innerHTML='';jobs.forEach(j=>{if(!j.el){card(j);}q.append(j.el);upd(j)})}
+function addJob(a,files,o,name){const j={id:++jid,name,audio:a,files:files.slice(),o,status:'waiting',prog:0,msg:'',dur:0};jobs.push(j);order();runQueue()}
+function rmJob(j){if(j.status=='rendering'||j.status=='paused'||j.status=='preparing')return;if(j.url)URL.revokeObjectURL(j.url);j.sink&&j.sink.remove();jobs=jobs.filter(x=>x!==j);j.el&&j.el.remove();order();summary()}
+$('#add').onclick=async()=>{if(!audio)return st('Choose a music file first.',1);if(!pick.length)return st('Add some video loops first.',1);if(!MIME)return st('This browser cannot record video.',1);
+ AC??=new AudioContext();await AC.resume();const o=getO(),nv=clamp(+$('#nver').value||1,1,10),base=$('#jname').value.trim()||audio.name.replace(/\.[^.]+$/,'');st('');
+ for(let i=0;i<nv;i++)addJob(audio,pick,{...o,seed:o.seed!==''?+o.seed+i:Math.floor(Math.random()*1e9)},nv>1?`${base} #${i+1}`:base)};
+$('#qpause').onclick=()=>cur&&(cur.status=='paused'?cur.ctl.resume():cur.ctl.pause());$('#qstop').onclick=()=>cur&&cur.ctl&&cur.ctl.stop();
+$('#qclear').onclick=()=>jobs.filter(j=>['done','stopped','failed'].includes(j.status)).forEach(rmJob);
+async function runQueue(){if(running)return;running=true;
+ for(;;){const j=jobs.find(x=>x.status=='waiting');if(!j)break;cur=j;
+  try{await doJob(j)}catch(e){if(e.message=='Cancelled')j.status='stopped';else if(j.status!='stopped'){j.status='failed';j.err=e.message||String(e)}}j.msg='';upd(j);cur=null;summary()}
+ running=false}
+async function doJob(j){
+ const o=j.o,msg=m=>{j.msg=m;upd(j)};j.status='preparing';msg('Preparing…');
+ const ak=fkey(j.audio)+'|'+o.secLen;if(aCache.key!=ak){const fk=fkey(j.audio);let buf=aCache.fk==fk?aCache.buf:null;
+  if(!buf){msg('Decoding the music…');buf=await AC.decodeAudioData(await j.audio.arrayBuffer())}const A0=await analyzeAudio(buf,o.secLen,msg);A0.buf=buf;aCache={key:ak,fk,buf,A:A0}}
+ const A=aCache.A;curA=A;paceTxt();j.dur=A.dur;if(j.cancel)throw new Error('Cancelled');
+ const {L,bad}=await loopsFor(j.files,o,msg);if(j.cancel)throw new Error('Cancelled');
+ $('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');
+ const S=normLoops(L,o.clip?.7:0),P=plan(A,L,S,o,mkrng(o.seed));
+ j.info=`${A.tempo.toFixed(0)} BPM · ${P.slots.length} shots · ${A.sections.length} sections · ${P.coverage.used}/${P.coverage.total} loops used${bad?` · ${bad} unreadable`:''}`;
+ drawTL(j,A,P);msg('');await renderJob(j,A,L,P)}
+addEventListener('beforeunload',e=>{if(jobs.some(j=>['preparing','rendering','paused'].includes(j.status))){e.preventDefault();e.returnValue=''}});
+$('#pre').querySelector('[data-p="Chill"]').click();paceTxt();summary();
 </script>
 </body></html>
