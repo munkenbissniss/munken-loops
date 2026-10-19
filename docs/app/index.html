@@ -24,7 +24,7 @@ details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;fo
 .pace{font-size:.9rem;background:var(--bg);border-radius:8px;padding:6px 10px;margin:6px 0}#st{min-height:1.4em}#st.err{color:var(--bad)}.note{font-size:.85rem;color:var(--warn)}
 #sum{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}.pill{border:1px solid var(--line);border-radius:999px;padding:1px 12px;font-size:.88rem;background:var(--bg)}
 .job{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--bg)}.jh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.chip{font-size:.78rem;padding:1px 10px;border-radius:999px;border:1px solid currentColor;font-weight:700}.waiting,.preparing{color:var(--a)}.rendering{color:var(--b)}.paused{color:var(--warn)}.done{color:var(--ok)}.failed,.stopped{color:var(--bad)}
+.chip{font-size:.78rem;padding:1px 10px;border-radius:999px;border:1px solid currentColor;font-weight:700}.waiting,.preparing,.finalizing{color:var(--a)}.rendering{color:var(--b)}.paused{color:var(--warn)}.done{color:var(--ok)}.failed,.stopped{color:var(--bad)}
 .jb{display:flex;gap:12px;margin-top:8px}.jb canvas.jt{width:192px;height:108px;background:#000;border-radius:8px;flex:none}@media(max-width:700px){.jb{flex-direction:column}}
 .jr{flex:1;min-width:0}.prog{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:2px 0}.prog i{display:block;height:100%;background:var(--b);width:0}canvas.jl{width:100%;height:44px;display:block;margin:6px 0}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.fmt{font-size:.82rem;margin-top:6px}
@@ -331,6 +331,80 @@ async function openSink(name){let w=null,root=null,fh=null;try{root=await naviga
  return{write(b){p=p.then(()=>w?w.write(b):void mem.push(b))},async close(){await p;if(w){await w.close();return fh.getFile()}return new Blob(mem,{type:MIME})},async remove(){try{root&&await root.removeEntry(name)}catch(e){}}}}
 const tickW=new Worker(URL.createObjectURL(new Blob(['let id;onmessage=e=>{clearInterval(id);if(e.data)id=setInterval(()=>postMessage(0),1000/e.data)}'])));
 
+/* REMUX:START — rewrites a fragmented MP4 (as made by MediaRecorder) into a regular MP4 with correct duration, index and seeking. No re-encoding. */
+async function fixMp4(file,sink,progress){
+ const fcc=(d,o)=>String.fromCharCode(d.getUint8(o),d.getUint8(o+1),d.getUint8(o+2),d.getUint8(o+3));
+ const top=[];for(let pos=0;pos+8<=file.size;){const d=new DataView(await file.slice(pos,pos+16).arrayBuffer());let size=d.getUint32(0),hdr=8;
+  if(size==1){size=Number(d.getBigUint64(8));hdr=16}else if(size==0)size=file.size-pos;if(size<hdr)break;top.push({type:fcc(d,4),pos,size:Math.min(size,file.size-pos),hdr});pos+=size}
+ const mb=top.find(b=>b.type=='moov');if(!mb)return false;
+ const moov=new Uint8Array(await file.slice(mb.pos,mb.pos+mb.size).arrayBuffer()),M=new DataView(moov.buffer);
+ const kids=(dv,s,e)=>{const out=[];for(let p=s;p+8<=e;){let size=dv.getUint32(p),hdr=8;if(size==1){size=Number(dv.getBigUint64(p+8));hdr=16}else if(size==0)size=e-p;if(size<hdr)break;out.push({type:fcc(dv,p+4),s:p,e:Math.min(e,p+size),h:hdr});p+=size}return out};
+ const find=(l,t)=>l.find(b=>b.type==t),mk=kids(M,mb.hdr,moov.length),mvex=find(mk,'mvex');if(!mvex)return false;
+ const mvhd=find(mk,'mvhd'),mv=moov[mvhd.s+mvhd.h],movTs=M.getUint32(mvhd.s+mvhd.h+(mv?20:12));
+ const trex={};kids(M,mvex.s+mvex.h,mvex.e).filter(b=>b.type=='trex').forEach(b=>{const o=b.s+b.h+4;trex[M.getUint32(o)]={dur:M.getUint32(o+8),size:M.getUint32(o+12),flags:M.getUint32(o+16)}});
+ const T={};mk.filter(b=>b.type=='trak').forEach(tb=>{const tk=kids(M,tb.s+tb.h,tb.e),tkhd=find(tk,'tkhd'),md=find(tk,'mdia'),mc=kids(M,md.s+md.h,md.e),mdhd=find(mc,'mdhd'),hdlr=find(mc,'hdlr'),minf=find(mc,'minf'),mi=kids(M,minf.s+minf.h,minf.e),stbl=find(mi,'stbl'),st=kids(M,stbl.s+stbl.h,stbl.e),
+  id=M.getUint32(tkhd.s+tkhd.h+(moov[tkhd.s+tkhd.h]?20:12)),ts=M.getUint32(mdhd.s+mdhd.h+(moov[mdhd.s+mdhd.h]?20:12));
+  T[id]={id,tb,tk,tkhd,md,mc,mdhd,minf,mi,stsd:find(st,'stsd'),ts,video:fcc(M,hdlr.s+hdlr.h+8)=='vide',dur:[],size:[],sync:[],cto:[],chunks:[],start:null,ctoNeg:false}});
+ // read every fragment
+ for(const mf of top.filter(b=>b.type=='moof')){
+  const buf=new Uint8Array(await file.slice(mf.pos,mf.pos+mf.size).arrayBuffer()),D=new DataView(buf.buffer),trafs=kids(D,mf.hdr,buf.length).filter(b=>b.type=='traf'),add=[];let bad=false;
+  for(const tf of trafs){const k=kids(D,tf.s+tf.h,tf.e),th=find(k,'tfhd'),fl=D.getUint32(th.s+th.h)&0xffffff;let p=th.s+th.h+4;const id=D.getUint32(p);p+=4;const tr=T[id];if(!tr)continue;
+   let base=mf.pos;if(fl&1){base=Number(D.getBigUint64(p));p+=8}if(fl&2)p+=4;const X=trex[id]||{dur:0,size:0,flags:0};let dd=X.dur,ds=X.size,df=X.flags;
+   if(fl&8){dd=D.getUint32(p);p+=4}if(fl&0x10){ds=D.getUint32(p);p+=4}if(fl&0x20){df=D.getUint32(p);p+=4}
+   const td=find(k,'tfdt'),tdt=td?(buf[td.s+td.h]?Number(D.getBigUint64(td.s+td.h+4)):D.getUint32(td.s+td.h+4)):null;let cursor=base,firstRun=true;
+   for(const tn of k.filter(b=>b.type=='trun')){const ver=buf[tn.s+tn.h],f=D.getUint32(tn.s+tn.h)&0xffffff;let q=tn.s+tn.h+4;const n=D.getUint32(q);q+=4;let off=null,ff=null;
+    if(f&1){off=D.getInt32(q);q+=4}if(f&4){ff=D.getUint32(q);q+=4}if(off!==null)cursor=base+off;const start=cursor,S={dur:[],size:[],sync:[],cto:[]};
+    for(let i=0;i<n;i++){let d=dd,s=ds,fg=i==0&&ff!==null?ff:df,c=0;if(f&0x100){d=D.getUint32(q);q+=4}if(f&0x200){s=D.getUint32(q);q+=4}
+     if(f&0x400){const v=D.getUint32(q);q+=4;if(!(i==0&&ff!==null))fg=v}if(f&0x800){c=ver?D.getInt32(q):D.getUint32(q);q+=4}
+     S.dur.push(d);S.size.push(s);S.sync.push(!(fg&0x10000));S.cto.push(c);cursor+=s}
+    if(cursor>file.size){bad=true;break}add.push({tr,S,pos:start,len:cursor-start,tdt:firstRun?tdt:null});firstRun=false}
+   if(bad)break}
+  if(bad)break;
+  for(const a of add){const tr=a.tr,i0=tr.size.length;if(tr.start===null&&a.tdt!==null)tr.start=a.tdt;a.S.sync.forEach((s,i)=>{if(s)tr.sync.push(tr.size.length+i+1)});
+   a.S.dur.forEach(x=>tr.dur.push(x));a.S.size.forEach(x=>tr.size.push(x));a.S.cto.forEach(x=>{tr.cto.push(x);if(x<0)tr.ctoNeg=true});tr.chunks.push({pos:a.pos,len:a.len,n:a.S.size.length,tdt:a.tdt,i0})}}
+ const tracks=Object.values(T).filter(t=>t.size.length);if(!tracks.length)return false;
+ // where a fragment's sample durations are missing (zero), derive them from the next fragment's timestamp (tfdt)
+ tracks.forEach(t=>t.chunks.forEach((c,i)=>{const nx=t.chunks[i+1];if(c.tdt==null||!nx||nx.tdt==null)return;const exp=nx.tdt-c.tdt;if(exp<=0)return;let sum=0,zero=false;for(let k=c.i0;k<c.i0+c.n;k++){sum+=t.dur[k];if(!t.dur[k])zero=true}if(!zero||sum===exp)return;
+  let acc=0;for(let k=c.i0;k<c.i0+c.n;k++){const v=k==c.i0+c.n-1?exp-acc:Math.round(sum>0?t.dur[k]*exp/sum:exp/c.n);t.dur[k]=v;acc+=v}}));
+ // samples without a usable duration get the most common one, so time never stands still
+ tracks.forEach(t=>{const cnt={};t.dur.forEach(d=>{if(d>0)cnt[d]=(cnt[d]||0)+1});const best=Object.keys(cnt).sort((x,y)=>cnt[y]-cnt[x])[0];if(best)t.dur=t.dur.map(d=>d>0?d:+best)});
+ // layout of media data: original order
+ const all=tracks.flatMap(t=>t.chunks).sort((a,b)=>a.pos-b.pos);let total=0;all.forEach(c=>{c.rel=total;total+=c.len});
+ const u32=n=>{const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,n>>>0);return b},i32=n=>{const b=new Uint8Array(4);new DataView(b.buffer).setInt32(0,n);return b},
+  u64=n=>{const b=new Uint8Array(8);new DataView(b.buffer).setBigUint64(0,BigInt(n));return b},cat=(...a)=>{const o=new Uint8Array(a.reduce((s,x)=>s+x.length,0));let p=0;a.forEach(x=>{o.set(x,p);p+=x.length});return o},
+  box=(t,...p)=>{const b=cat(...p);return cat(u32(8+b.length),Uint8Array.from(t,c=>c.charCodeAt(0)),b)},fbox=(t,v,fl,...p)=>box(t,u32((v<<24)|fl),...p);
+ const t0=Math.min(...tracks.map(t=>(t.start||0)/t.ts));
+ const mdur=t=>t.dur.reduce((a,b)=>a+b,0),offs=t=>(t.start||0)/t.ts-t0;
+ const movDur=Math.max(...tracks.map(t=>Math.round((mdur(t)/t.ts+offs(t))*movTs)));
+ const setDur=(bytes,off,v8,val)=>{const d=new DataView(bytes.buffer,bytes.byteOffset);if(v8)d.setBigUint64(off,BigInt(val));else d.setUint32(off,val)};
+ const co64=total+(moov.length*3)+8*tracks.reduce((a,t)=>a+t.chunks.length,0)+16>0xFFFFFFFF;
+ const buildMoov=base=>{
+  const trs=tracks.map(t=>{
+   const runs=(arr,key)=>{const o=[];arr.forEach(v=>{const l=o[o.length-1];if(l&&l[1]===v)l[0]++;else o.push([1,v])});return o};
+   const sd=runs(t.dur),sttsB=fbox('stts',0,0,u32(sd.length),...sd.map(([c,d])=>cat(u32(c),u32(d))));
+   const hasC=t.cto.some(x=>x!==0),cd=runs(t.cto),cttsB=hasC?fbox('ctts',t.ctoNeg?1:0,0,u32(cd.length),...cd.map(([c,d])=>cat(u32(c),i32(d)))):new Uint8Array(0);
+   const stssB=t.video&&t.sync.length<t.size.length?fbox('stss',0,0,u32(t.sync.length),...t.sync.map(u32)):new Uint8Array(0);
+   const sc=[];t.chunks.forEach((c,i)=>{const l=sc[sc.length-1];if(!l||l[1]!==c.n)sc.push([i+1,c.n])});
+   const stscB=fbox('stsc',0,0,u32(sc.length),...sc.map(([f,n])=>cat(u32(f),u32(n),u32(1))));
+   const stszB=fbox('stsz',0,0,u32(0),u32(t.size.length),...t.size.map(u32));
+   const stcoB=co64?fbox('co64',0,0,u32(t.chunks.length),...t.chunks.map(c=>u64(base+c.rel))):fbox('stco',0,0,u32(t.chunks.length),...t.chunks.map(c=>u32(base+c.rel)));
+   const stbl=box("stbl",moov.slice(t.stsd.s,t.stsd.e),sttsB,cttsB,stssB,stscB,stszB,stcoB);
+   const minf=box('minf',...t.mi.filter(b=>b.type!='stbl').map(b=>moov.slice(b.s,b.e)),stbl);
+   const mdhd=moov.slice(t.mdhd.s,t.mdhd.e),m8=moov[t.mdhd.s+t.mdhd.h];setDur(mdhd,t.mdhd.h+(m8?24:16),m8,mdur(t));
+   const mdia=box('mdia',mdhd,...t.mc.filter(b=>b.type!='mdhd'&&b.type!='minf').map(b=>moov.slice(b.s,b.e)),minf);
+   const tkhd=moov.slice(t.tkhd.s,t.tkhd.e),k8=moov[t.tkhd.s+t.tkhd.h],o=offs(t),segDur=Math.round(mdur(t)/t.ts*movTs);setDur(tkhd,t.tkhd.h+(k8?28:20),k8,Math.round((mdur(t)/t.ts+o)*movTs));
+   const edts=o>.002?box('edts',fbox('elst',0,0,u32(2),u32(Math.round(o*movTs)),i32(-1),u32(0x10000),u32(segDur),i32(0),u32(0x10000))):new Uint8Array(0);
+   return box('trak',tkhd,edts,...t.tk.filter(b=>!['tkhd','mdia','edts'].includes(b.type)).map(b=>moov.slice(b.s,b.e)),mdia)});
+  const mh=moov.slice(mvhd.s,mvhd.e);setDur(mh,mvhd.h+(mv?24:16),mv,movDur);
+  return box('moov',mh,...trs,...mk.filter(b=>!['mvhd','trak','mvex'].includes(b.type)).map(b=>moov.slice(b.s,b.e)))};
+ const ftyp=box('ftyp',Uint8Array.from('isom',c=>c.charCodeAt(0)),u32(512),...['isom','iso2','avc1','mp41'].map(s=>Uint8Array.from(s,c=>c.charCodeAt(0))));
+ const big=total+8>0xFFFFFFFF,mh=big?cat(u32(1),Uint8Array.from('mdat',c=>c.charCodeAt(0)),u64(total+16)):cat(u32(total+8),Uint8Array.from('mdat',c=>c.charCodeAt(0)));
+ const size0=buildMoov(0).length,moov2=buildMoov(ftyp.length+size0+mh.length);
+ sink.write(new Blob([ftyp,moov2,mh]));
+ let i=0,done=0;while(i<all.length){let a=all[i],end=a.pos+a.len,j=i+1;while(j<all.length&&all[j].pos==end){end+=all[j].len;j++}sink.write(file.slice(a.pos,end));done+=end-a.pos;i=j;if(progress&&i%40==0)progress(done/total)}
+ return true}
+/* REMUX:END */
+
 /* ---------------- renderer (offscreen canvas, no preview, real time) ---------------- */
 const POOL=10,LOOK=20,pool=[];
 function mkPool(){if(pool.length)return;for(let i=0;i<POOL;i++){const el=document.createElement('video');el.muted=true;el.loop=true;el.playsInline=true;el.preload='auto';el.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';document.body.append(el);pool.push({el,loop:-1,url:'',t:0})}}
@@ -359,7 +433,11 @@ function renderJob(j,A,L,P){
   const rec=new MediaRecorder(new MediaStream([...cv.captureStream(o.fps).getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:MIME,videoBitsPerSecond:o.bitrate*1e6,audioBitsPerSecond:192000});
   rec.ondataavailable=e=>{if(e.data.size)sink.write(e.data)};
   let ended=false;const finish=async why=>{if(ended)return;ended=true;tickW.postMessage(0);try{src.stop()}catch(e){}pool.forEach(p=>p.el.pause());
-   await new Promise(r=>{rec.onstop=r;if(rec.state!='inactive')rec.stop();else r()});const f=await sink.close();j.file=f;j.url=URL.createObjectURL(f);j.status=why;j.prog=why=='done'?1:j.prog;j.msg='';upd(j);if(AC.state=='suspended')AC.resume();resolve()};
+   await new Promise(r=>{rec.onstop=r;if(rec.state!='inactive')rec.stop();else r()});let f=await sink.close();
+   if(EXT=='mp4'){j.status='finalizing';j.msg='Fixing duration and seeking…';upd(j);
+    try{const s2=await openSink(`${j.id}-fixed-${Date.now()}.mp4`);const ok=await fixMp4(f,s2,p=>{j.msg=`Fixing duration and seeking… ${Math.round(p*100)} %`;upd(j)});
+     if(ok){const f2=await s2.close();await sink.remove();j.sink=s2;f=f2}else await s2.remove()}catch(e){j.note='Could not fix the MP4 index ('+(e.message||e)+'). The original file is kept.'}}
+   j.file=f;j.url=URL.createObjectURL(f);j.status=why;j.prog=why=='done'?1:j.prog;j.msg='';upd(j);if(AC.state=='suspended')AC.resume();resolve()};
   j.ctl={pause:async()=>{if(j.status!='rendering')return;j.status='paused';await AC.suspend();rec.state=='recording'&&rec.pause();pool.forEach(p=>p.el.pause());upd(j)},
    resume:async()=>{if(j.status!='paused')return;j.status='rendering';rec.state=='paused'&&rec.resume();await AC.resume();upd(j)},stop:()=>{if(j.status=='paused')AC.resume();finish('stopped')}};
   const tS=AC.currentTime+.3;src.start(tS);rec.start(1000);j.status='rendering';j.msg='';upd(j);let lastUI=0,lastRate=0,rate=1;
@@ -396,19 +474,19 @@ function card(j){const d=document.createElement('div');d.className='job';
   if(a=='pause')j.status=='paused'?j.ctl.resume():j.ctl.pause();if(a=='stop'){if(j.ctl&&(j.status=='rendering'||j.status=='paused'))j.ctl.stop();else if(j.status=='waiting'||j.status=='preparing'){j.cancel=true;j.status=j.status=='waiting'?'stopped':j.status;upd(j)}}
   if(a=='rm')rmJob(j);if(a=='again')addJob(j.audio,j.files,{...j.o,seed:Math.floor(Math.random()*1e9)},j.name.replace(/ #\d+$/,'')+' (again)');if(a=='up'){const i=jobs.indexOf(j);if(i>0&&jobs[i-1].status=='waiting'){[jobs[i-1],jobs[i]]=[jobs[i],jobs[i-1]];order()}}};
  return d}
-const CH={waiting:'Waiting',preparing:'Preparing',rendering:'Rendering',paused:'Paused',done:'Done',failed:'Failed',stopped:'Stopped'};
+const CH={waiting:'Waiting',preparing:'Preparing',finalizing:'Finalizing',rendering:'Rendering',paused:'Paused',done:'Done',failed:'Failed',stopped:'Stopped'};
 function upd(j){const d=j.el;if(!d)return;const q=s=>d.querySelector(s);q('.jn').textContent=j.name;const ch=q('.chip');ch.textContent=CH[j.status];ch.className='chip '+j.status;
  q('.jm').textContent=`${j.audio.name} · ${j.files.length} loops · ${j.o.res} · ${j.o.shotBars}-bar shots · seed ${j.o.seed}`+(j.info?' · '+j.info:'');
  q('.prog i').style.width=Math.round(100*j.prog)+'%';const dur=j.dur||0,live=j.status=='rendering'||j.status=='paused';
  q('.jp').textContent=j.msg||(dur?`${fmtT(j.prog*dur)} / ${fmtT(dur)}${live?` · about ${fmtT(dur*(1-j.prog))} left`:''}`:(j.status=='waiting'?'In the queue':''));
  const act=q('.acts'),b=(a,t,m)=>`<button class="sm ${m||''}" data-a="${a}">${t}</button>`;
  let h='';if(live)h+=b('pause',j.status=='paused'?'Resume':'Pause')+b('stop','Stop (keep what is done)');else if(j.status=='waiting')h+=b('up','Move up')+b('stop','Cancel')+b('rm','Remove');else if(j.status=='preparing')h+=b('stop','Cancel');
- else{if(j.url)h+=`<a class="btn sm main" href="${j.url}" download="${j.name.replace(/[^\w\-. ]+/g,'_')}.${EXT}">Download ${EXT.toUpperCase()}${j.file?' ('+(j.file.size/1e6).toFixed(0)+' MB)':''}</a>`;h+=b('again','Again, new seed')+b('rm','Remove')}
+ else if(j.status!='finalizing'){if(j.url)h+=`<a class="btn sm main" href="${j.url}" download="${j.name.replace(/[^\w\-. ]+/g,'_')}.${EXT}">Download ${EXT.toUpperCase()}${j.file?' ('+(j.file.size/1e6).toFixed(0)+' MB)':''}</a>`;h+=b('again','Again, new seed')+b('rm','Remove')}
  if(act.dataset.h!=h){act.innerHTML=h;act.dataset.h=h}
- q('.jf').textContent=j.status=='failed'?j.err:(j.status=='stopped'&&j.url?'Stopped early. The part that was rendered can still be downloaded.':'');
+ q('.jf').textContent=j.status=='failed'?j.err:(j.status=='stopped'&&j.url?'Stopped early. The part that was rendered can still be downloaded.':'')+(j.note?' '+j.note:'');
  q('.jt').style.display=live||j.status=='done'||j.status=='stopped'?'':'none';summary()}
-function summary(){const c=s=>jobs.filter(j=>s.includes(j.status)).length,left=jobs.reduce((a,j)=>a+(['waiting','preparing','rendering','paused'].includes(j.status)?(j.dur||0)*(1-(j.prog||0)):0),0);
- $('#sum').innerHTML=[['Rendering',c(['rendering','paused','preparing'])],['Waiting',c(['waiting'])],['Done',c(['done'])],['Stopped/failed',c(['stopped','failed'])]].map(([n,v])=>`<span class="pill">${n}: <b>${v}</b></span>`).join('')+(left>0?`<span class="pill">About ${fmtT(left)} of rendering left (known so far)</span>`:'');
+function summary(){const c=s=>jobs.filter(j=>s.includes(j.status)).length,left=jobs.reduce((a,j)=>a+(['waiting','preparing','rendering','paused','finalizing'].includes(j.status)?(j.dur||0)*(1-(j.prog||0)):0),0);
+ $('#sum').innerHTML=[['Rendering',c(['rendering','paused','preparing','finalizing'])],['Waiting',c(['waiting'])],['Done',c(['done'])],['Stopped/failed',c(['stopped','failed'])]].map(([n,v])=>`<span class="pill">${n}: <b>${v}</b></span>`).join('')+(left>0?`<span class="pill">About ${fmtT(left)} of rendering left (known so far)</span>`:'');
  const live=cur&&(cur.status=='rendering'||cur.status=='paused');$('#qpause').disabled=!live;$('#qstop').disabled=!live;$('#qpause').textContent=cur&&cur.status=='paused'?'Resume':'Pause'}
 function order(){const q=$('#queue');if(!jobs.length){q.innerHTML='<p class="mute">The queue is empty.</p>';return}if(q.querySelector('p'))q.innerHTML='';jobs.forEach(j=>{if(!j.el){card(j);}q.append(j.el);upd(j)})}
 function addJob(a,files,o,name){const j={id:++jid,name,audio:a,files:files.slice(),o,status:'waiting',prog:0,msg:'',dur:0};jobs.push(j);order();runQueue()}
@@ -432,7 +510,7 @@ async function doJob(j){
  const S=normLoops(L,o.clip?.7:0),P=plan(A,L,S,o,mkrng(o.seed));
  j.info=`${A.tempo.toFixed(0)} BPM · ${P.slots.length} shots · ${A.sections.length} sections · ${P.coverage.used}/${P.coverage.total} loops used${bad?` · ${bad} unreadable`:''}`;
  drawTL(j,A,P);msg('');await renderJob(j,A,L,P)}
-addEventListener('beforeunload',e=>{if(jobs.some(j=>['preparing','rendering','paused'].includes(j.status))){e.preventDefault();e.returnValue=''}});
+addEventListener('beforeunload',e=>{if(jobs.some(j=>['preparing','rendering','paused','finalizing'].includes(j.status))){e.preventDefault();e.returnValue=''}});
 $('#pre').querySelector('[data-p="Chill"]').click();paceTxt();summary();
 </script>
 </body></html>
