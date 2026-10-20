@@ -42,10 +42,10 @@ details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;fo
   <div class="bar"><button class="sm" id="redraw" disabled>Draw a new selection of 100</button><button class="sm" id="anaL" disabled>Analyze loops now (shows thumbnails)</button></div>
   <div id="thumbs"></div></div>
 </div>
-<input type="file" id="fA" accept="audio/*" hidden><input type="file" id="fV" accept="video/*" multiple hidden><input type="file" id="fD" webkitdirectory multiple hidden>
+<input type="file" id="fA" hidden><input type="file" id="fV" accept="video/*,.mp4,.mov,.m4v,.webm,.mkv" multiple hidden><input type="file" id="fD" webkitdirectory multiple hidden>
 
 <div class="card"><h2>3. Mix settings</h2>
- <div class="bar"><b>Mood:</b> <span id="pre"></span><span class="mute" id="pmsg"></span></div><div id="groups"></div></div>
+ <div class="bar"><b>Mood:</b> <span id="pre"></span><span class="mute" id="pmsg"></span></div><div class="pace" id="recWhy" style="margin-top:8px;display:none"></div><div id="groups"></div></div>
 
 <div class="card"><h2>4. Export</h2>
  <div class="bar"><label>Name <input type="text" id="jname" placeholder="(track name)" style="width:220px"></label>
@@ -85,6 +85,7 @@ async function analyzeAudio(ab,secLen,prog){
   let lw=0;for(let k=2;k<=lowEnd;k++)lw+=mg[k];low[t]=Math.log(1+lw);
   let f=0;for(let b=0;b<B;b++){let q=0;for(let k=edges[b];k<edges[b+1];k++)q+=mg[k];q=Math.log(1+q);band[t*B+b]=q;f+=Math.max(0,q-prev[b]);prev[b]=q}flux[t]=f;
   if(t%800==0){prog&&prog(`Analyzing music… ${Math.round(100*t/T)} %`);await new Promise(r=>setTimeout(r))}}
+ prog&&prog('Finding the beat…');await new Promise(r=>setTimeout(r));
  const o=sm(Array.from(flux),1),sd=Math.sqrt(Math.max(1e-12,mean(o.map(v=>v*v),0,T)-mean(o,0,T)**2))+1e-9,oo=o.map(v=>v/sd);
  let P=0,bs=-1;for(let L=Math.round(fr*60/200);L<=Math.round(fr*60/60);L++){let s=0;for(let i=0;i+L<T;i++)s+=oo[i]*oo[i+L];s/=T-L;
   s*=Math.exp(-.5*(Math.log2(60*fr/L/120)/.9)**2);if(s>bs){bs=s;P=L}}
@@ -106,6 +107,7 @@ async function analyzeAudio(ab,secLen,prog){
  for(let t=3;t<T-3;t++){let ok=lf[t]>lmu+.5*lsd;for(let j=-3;j<=3&&ok;j++)if(lf[t+j]>lf[t])ok=false;
   if(ok&&t*H/sr+off-last>.12){last=t*H/sr+off;kicks.push(last);kst.push(lf[t])}}
  const k90=pctl(kst.length?kst:[1],90)+1e-9,kstr=kst.map(v=>clamp(v/k90,0,1));
+ prog&&prog('Finding song sections…');await new Promise(r=>setTimeout(r));
  const z=feat.map(v=>Float64Array.from(v));for(let b=0;b<B;b++){const m=mean(z.map(v=>v[b]),0,nb),s=Math.sqrt(mean(z.map(v=>(v[b]-m)**2),0,nb))+1e-9;z.forEach(v=>v[b]=(v[b]-m)/s)}
  const avg=(i,j)=>{const v=new Float64Array(B);let n=0;for(let k=Math.max(0,i);k<Math.min(nb,j);k++){for(let b=0;b<B;b++)v[b]+=z[k][b];n++}return v.map(a=>a/(n||1))};
  const dist=(a,b)=>Math.sqrt(a.reduce((s,v,i)=>s+(v-b[i])**2,0)),snap=i=>{const r=((i-ph)%4+4)%4;return clamp(i+(r<=2?-r:4-r),0,nb-1)};
@@ -200,7 +202,7 @@ const DEFS=[
   R('styleMatch','Style match',0,1,.05,.7,'How alike the loops in one set must be in colour, brightness, texture and motion. High = a consistent look. Low = more contrast.'),
   R('variety','Variety',0,1,.05,.6,'Randomness when choosing loops. Low = always the best match. High = more surprising choices.'),
   Chk('useAll','Use every loop',true,'Tries to show all your loops at least once, by giving the ones not yet used priority and adding them as short layers on top of longer shots. The queue shows how many were used.'),
-  Chk('clip','Use CLIP (AI image understanding)',false,'Lets an AI model look at your loops and judge how similar they really are. The first time, a model (about 100–150 MB) is downloaded from huggingface.co and cached in your browser. After that it works offline.'),
+  Chk('clip','Use CLIP (AI image understanding)',true,'Lets an AI model look at your loops and judge how similar they really are. The first time, a model (about 100–150 MB) is downloaded from huggingface.co and cached in your browser. After that it works offline.'),
   Num('theme','Theme (optional, English)','For example: dark forest, slow water, neon city. Needs CLIP. Loops that match the text are preferred.'),
   R('matchEnergy','Match the music\'s intensity',0,1,.05,.6,'How strongly loops are chosen to suit the energy of the music. 0 ignores it.',1),
   R('secLen','Section length (s)',15,180,5,45,'Roughly how long the music may stay in one scene with the same set of loops. Longer = fewer scene changes.',1),
@@ -230,11 +232,11 @@ const DEFS=[
   Sel('shakeOn','Shake on',ON,'kick','',1),
   R('pulse','Brightness pulse',0,.3,.01,0,'Picture flashes lighter or darker on each trigger. 0.05 is subtle.',1),
   Sel('pulseOn','Pulse on',ON,'kick','',1),
-  Sel('pulseMode','Pulse type',['light','dark'],'light','Light = flash brighter, dark = dip darker.',1)]],
+  Sel('pulseMode','Pulse type',['light','dark'],'dark','Light = flash brighter, dark = dip darker.',1)]],
  ['Output','',[
   Sel('res','Picture size',['1280x720','1920x1080','2560x1440','3840x2160','1080x1920'],'1920x1080','Larger is sharper but needs a stronger computer. If the export stutters, choose a smaller size.'),
   Sel('bitrate','Quality (Mbit/s)',[4,8,16,32],8,'Higher = better picture and a larger file. 8 Mbit/s is about 600 MB for 10 minutes.'),
-  Sel('fps','Frame rate',[24,30,60],30,'',1),
+  Sel('fps','Frame rate',[24,30,60],60,'',1),
   R('sync','Sync offset (ms)',-200,200,5,0,'If the picture feels slightly early or late compared with the music, shift it here.',1)]]];
 const PRE={Ambient:{shotBars:16,follow:.3,minBars:8,maxBars:32,setSize:3,fade:16,layerDensity:.4,lookVar:.3,trails:.3,slowmo:.5,breathe:.04,zoom:0,shake:0,pulse:0},
  Chill:{shotBars:8,follow:.5,minBars:4,maxBars:32,setSize:3,fade:8,layerDensity:.5,lookVar:.4,trails:0,slowmo:.3,breathe:.03,zoom:0,shake:0,pulse:0},
@@ -255,8 +257,42 @@ const getO=()=>{const o={};ALL.forEach(f=>{const e=$('#o_'+f.k);o[f.k]=f.t=='c'?
 let curA=null;
 const paceTxt=()=>{const o=getO(),bpm=curA?curA.tempo:120,beat=60/bpm,s=`At ${bpm.toFixed(0)} BPM${curA?'':' (assumed until the music is analysed)'}: a typical shot lasts about ${(o.shotBars*4*beat).toFixed(0)} s, and each crossfade about ${(o.fade*beat).toFixed(1)} s.`;$('#paceP').textContent=s;$('#paceT').textContent=s};
 $('#groups').addEventListener('input',e=>{if(e.target.type=='range')e.target.nextElementSibling.textContent=e.target.value;document.querySelectorAll('#pre button').forEach(x=>x.classList.remove('on'));$('#pmsg').textContent='';paceTxt()});
-$('#pre').innerHTML=Object.keys(PRE).map(n=>`<button class="sm" data-p="${n}">${n}</button>`).join(' ');
-$('#pre').onclick=e=>{const b=e.target.closest('[data-p]');if(!b)return;Object.entries(PRE[b.dataset.p]).forEach(([k,v])=>setO(k,v));
+
+/* ---------------- Recommended mood: settings chosen from the music and the loops ---------------- */
+function recommend(A,L,S){
+ const nearest=(v,opts)=>opts.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a),r20=x=>Math.round(x*20)/20;
+ const bpm=A.tempo,e=A.energy,mE=mean(e,0,e.length),dyn=Math.sqrt(mean(e.map(x=>(x-mE)**2),0,e.length)),kd=A.kicks.length/A.dur,
+  iv=A.bt.slice(1).map((t,i)=>t-A.bt[i]).filter(x=>x>.05),mi=mean(iv,0,iv.length)||.5,cv=Math.sqrt(mean(iv.map(x=>(x-mi)**2),0,iv.length))/mi,
+  mm=mean(L.map(l=>l.mm),0,L.length),motion=clamp((Math.log10(Math.max(mm,1e-4))+2.3)/1.3,0,1);
+ let sim=0,c=0;for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){sim+=S[i][j];c++}sim=c?sim/c:.5;
+ const drive=.4*clamp((bpm-70)/80,0,1)+.3*mE+.2*clamp(kd/3,0,1)+.1*clamp(dyn/.3,0,1),cls=drive<.35?'Ambient':drive<.55?'Chill':drive<.75?'Groove':'Energetic',
+  b=PRE[cls],beatS=60/bpm,barS=4*beatS,target={Ambient:28,Chill:16,Groove:9,Energetic:4.5}[cls]*(.85+.3*motion),
+  sb=[1,2,4,8,16,32][clamp(Math.round(Math.log2(target/barS)),0,5)],fadeF={Ambient:.4,Chill:.25,Groove:.15,Energetic:.08}[cls],
+  fade=clamp(Math.round(sb*4*fadeF*2)/2,.5,32),shots=A.dur/(sb*barS),setSize=L.length<6?2:cls=='Energetic'?4:3,
+  dense=L.length>shots*1.5,layers=dense?Math.max(b.layerDensity,.7):b.layerDensity;
+ const settings={shotBars:sb,minBars:nearest(sb/2,[1,2,4,8]),maxBars:nearest(sb*4,[4,8,16,32]),follow:clamp(r20(.3+dyn*2.5),.3,1.2),fade,setSize,
+  styleMatch:sim>.55?.6:sim<.35?.85:.7,variety:.5,matchEnergy:.6,secLen:{Ambient:60,Chill:45,Groove:30,Energetic:30}[cls],evolve:32,
+  layerDensity:r20(layers),lookVar:r20(clamp(b.lookVar-(sim<.35?.1:0),0,1)),trails:b.trails,slowmo:r20(clamp(b.slowmo*(1.2-motion*.4),0,1)),breathe:b.breathe,
+  zoom:b.zoom,zoomOn:b.zoomOn||'bar',shake:kd>1.5?b.shake:0,shakeOn:b.shakeOn||'kick',pulse:b.pulse,pulseOn:b.pulseOn||'kick',pulseMode:'dark'};
+ const why=[`Tempo ${bpm.toFixed(0)} BPM with a ${cv<.03?'steady':cv<.07?'fairly steady':'varying'} beat and ${kd.toFixed(1)} kick drums per second.`,
+  `${mE<.4?'Low':mE<.65?'Medium':'High'} energy with ${dyn>.25?'big':'small'} dynamics, ${A.drops.length} drop${A.drops.length==1?'':'s'} and ${A.breaks.length} break${A.breaks.length==1?'':'s'}, so the music feels ${cls}.`,
+  `Your loops are ${motion<.33?'calm':motion<.66?'moderately active':'very active'} and ${sim>.55?'quite alike':sim<.35?'quite different':'fairly varied'} in style, so shots last ${sb} bars (about ${Math.round(sb*barS)} s) with ${setSize} loops per section and style match ${settings.styleMatch}.`,
+  `Crossfades are ${fade} beats (about ${(fade*beatS).toFixed(1)} s) and the music is cut into sections of about ${settings.secLen} s.`];
+ if(dense)why.push(`${L.length} loops for about ${Math.round(shots)} shots, so layers are raised to ${settings.layerDensity} to let every loop be used.`);
+ return{settings,cls,why};
+}
+async function recommendNow(btn){
+ const say=m=>$('#pmsg').textContent=' '+m;
+ if(!audio||!pick.length){say('Add music and loops first, then choose Recommended.');return}
+ btn.disabled=true;say('Analyzing…');
+ try{AC??=new AudioContext();await AC.resume();const o=getO(),A=await getAudio(audio,o.secLen,say);curA=A;
+  const {L,useClip}=await loopsSafe(pick,o,say),S=normLoops(L,useClip?.7:0),R=recommend(A,L,S);
+  Object.entries(R.settings).forEach(([k,v])=>setO(k,v));
+  document.querySelectorAll('#pre button').forEach(x=>x.classList.toggle('on',x===btn));say(`Recommended is set (it feels ${R.cls}). You can still adjust everything below.`);
+  $('#recWhy').style.display='';$('#recWhy').innerHTML='<b>Why these settings</b><ul style="margin:4px 0 0;padding-left:1.2em">'+R.why.map(x=>`<li>${x}</li>`).join('')+'</ul>';paceTxt()
+ }catch(e){say(e.message||String(e))}finally{btn.disabled=false}}
+$('#pre').innerHTML=['Recommended',...Object.keys(PRE)].map(n=>`<button class="sm" data-p="${n}">${n}</button>`).join(' ');
+$('#pre').onclick=e=>{const b=e.target.closest('[data-p]');if(!b)return;if(b.dataset.p=='Recommended'){recommendNow(b);return}$('#recWhy').style.display='none';Object.entries(PRE[b.dataset.p]).forEach(([k,v])=>setO(k,v));
  document.querySelectorAll('#pre button').forEach(x=>x.classList.toggle('on',x===b));$('#pmsg').textContent=` ${b.dataset.p} is set. You can still adjust everything below.`;paceTxt()};
 
 /* ---------------- files ---------------- */
@@ -319,7 +355,13 @@ async function loopsFor(files,o,msg){
   if(o.theme.trim()){const t=await C.txt(o.theme.trim());L.forEach(l=>l.theme=l.emb.reduce((s,x,i)=>s+x*t[i],0))}}
  return{L,bad};
 }
-$('#anaL').onclick=async()=>{try{const o=getO(),{L,bad}=await loopsFor(pick,o,st);$('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');st(`${L.length} loops analyzed${bad?` (${bad} could not be read)`:''}.`)}catch(e){st(e.message,1)}};
+$('#anaL').onclick=async()=>{try{const o=getO(),{L,bad}=await loopsSafe(pick,o,st);$('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');st(`${L.length} loops analyzed${bad?` (${bad} could not be read)`:''}.`)}catch(e){st(e.message,1)}};
+
+async function loopsSafe(files,o,msg){
+ try{const r=await loopsFor(files,o,msg);return{...r,useClip:!!o.clip}}
+ catch(e){if(o.clip&&!/None of the videos/.test(e.message||'')){const r=await loopsFor(files,{...o,clip:false,theme:''},msg);return{...r,useClip:false,note:'CLIP could not run ('+(e.message||e)+'), so standard matching was used.'}}throw e}}
+async function getAudio(file,secLen,msg){const ak=fkey(file)+'|'+secLen;if(aCache.key!=ak){const fk=fkey(file);let buf=aCache.fk==fk?aCache.buf:null;
+ if(!buf){msg('Decoding the music…');buf=await AC.decodeAudioData(await file.arrayBuffer())}const A0=await analyzeAudio(buf,secLen,msg);A0.buf=buf;aCache={key:ak,fk,buf,A:A0}}return aCache.A}
 
 /* ---------------- recording helpers ---------------- */
 const MIMES=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -502,13 +544,11 @@ async function runQueue(){if(running)return;running=true;
  running=false}
 async function doJob(j){
  const o=j.o,msg=m=>{j.msg=m;upd(j)};j.status='preparing';msg('Preparing…');
- const ak=fkey(j.audio)+'|'+o.secLen;if(aCache.key!=ak){const fk=fkey(j.audio);let buf=aCache.fk==fk?aCache.buf:null;
-  if(!buf){msg('Decoding the music…');buf=await AC.decodeAudioData(await j.audio.arrayBuffer())}const A0=await analyzeAudio(buf,o.secLen,msg);A0.buf=buf;aCache={key:ak,fk,buf,A:A0}}
- const A=aCache.A;curA=A;paceTxt();j.dur=A.dur;if(j.cancel)throw new Error('Cancelled');
- const {L,bad}=await loopsFor(j.files,o,msg);if(j.cancel)throw new Error('Cancelled');
+ const A=await getAudio(j.audio,o.secLen,msg);curA=A;paceTxt();j.dur=A.dur;if(j.cancel)throw new Error('Cancelled');
+ const {L,bad,useClip,note}=await loopsSafe(j.files,o,msg);if(note)j.note=note;if(j.cancel)throw new Error('Cancelled');
  $('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');
- const S=normLoops(L,o.clip?.7:0),P=plan(A,L,S,o,mkrng(o.seed));
- j.info=`${A.tempo.toFixed(0)} BPM · ${P.slots.length} shots · ${A.sections.length} sections · ${P.coverage.used}/${P.coverage.total} loops used${bad?` · ${bad} unreadable`:''}`;
+ const S=normLoops(L,useClip?.7:0),P=plan(A,L,S,o,mkrng(o.seed));
+ j.info=`${A.tempo.toFixed(0)} BPM · ${P.slots.length} shots · ${A.sections.length} sections · ${P.coverage.used}/${P.coverage.total} loops used${useClip?' · CLIP':''}${bad?` · ${bad} unreadable`:''}`;
  drawTL(j,A,P);msg('');await renderJob(j,A,L,P)}
 addEventListener('beforeunload',e=>{if(jobs.some(j=>['preparing','rendering','paused','finalizing'].includes(j.status))){e.preventDefault();e.returnValue=''}});
 $('#pre').querySelector('[data-p="Chill"]').click();paceTxt();summary();

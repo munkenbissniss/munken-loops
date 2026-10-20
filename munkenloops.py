@@ -637,6 +637,47 @@ def collect_videos(paths):
     return out
 
 
+def recommend_cli(A, vids, sim, a, defaults):
+    """Recommended: velger innstillinger ut fra musikken (tempo, beat, energi, drops) og klippene (bevegelse, stil).
+    Innstillinger du har satt selv (ulik standardverdi) beholdes."""
+    bpm, e = A.tempo, A.energy
+    mean_e, dyn = float(np.mean(e)), float(np.std(e))
+    kd = len(A.kicks) / max(A.duration, 1.0)
+    iv = np.diff(A.bt)
+    iv = iv[iv > 0.05]
+    cv = float(np.std(iv) / np.mean(iv)) if len(iv) else 0.0
+    mm = float(np.mean([np.mean(v.motion) for v in vids]))
+    motion = min(max((math.log10(max(mm, 1e-4)) + 2.3) / 1.3, 0.0), 1.0)
+    spread = float(np.mean(np.std(np.array([v.desc for v in vids]), axis=0))) if len(vids) > 1 else 0.0
+    diverse = spread > 0.15
+    drive = (0.4 * min(max((bpm - 70) / 80, 0), 1) + 0.3 * mean_e
+             + 0.2 * min(kd / 3, 1) + 0.1 * min(dyn / 0.3, 1))
+    cls = "Ambient" if drive < 0.35 else "Chill" if drive < 0.55 else "Groove" if drive < 0.75 else "Energetic"
+    P = {
+        "Ambient":   dict(intensity=0.6, min_cut_beats=4, max_cut_beats=16, min_cut_seconds=2.0, randomness=0.25, continuity=0.6, crossfade=0.3, crossfade_max_energy=1.0),
+        "Chill":     dict(intensity=0.8, min_cut_beats=2, max_cut_beats=16, min_cut_seconds=1.2, randomness=0.30, continuity=0.5, crossfade=0.25, crossfade_max_energy=0.8),
+        "Groove":    dict(intensity=1.0, min_cut_beats=2, max_cut_beats=16, min_cut_seconds=0.7, randomness=0.35, continuity=0.4, crossfade=0.15, crossfade_max_energy=0.65,
+                          zoom=0.02, zoom_on="bar", pulse=0.05, pulse_on="kick"),
+        "Energetic": dict(intensity=1.3, min_cut_beats=1, max_cut_beats=8, min_cut_seconds=0.4, randomness=0.45, continuity=0.2, crossfade=0.08, crossfade_max_energy=0.5,
+                          zoom=0.05, zoom_on="beat", pulse=0.1, pulse_on="kick", drop_flash=True, shake=0.008 if kd > 1.5 else 0.0),
+    }[cls]
+    P = dict(P)
+    P["min_cut_seconds"] = round(P["min_cut_seconds"] * (0.9 + 0.3 * motion), 2)
+    if diverse:
+        P["continuity"] = round(P["continuity"] + 0.15, 2)
+    applied = []
+    for key, val in P.items():
+        if getattr(a, key) == defaults.get(key):
+            setattr(a, key, val)
+            applied.append(f"{key.replace('_', '-')}={val}")
+    a.crossfade = min(max(a.crossfade, 0.0), 0.5)
+    log("Recommended:")
+    log(f"  Tempo {bpm:.0f} BPM, {'jevnt' if cv < 0.03 else 'ganske jevnt' if cv < 0.07 else 'varierende'} beat, {kd:.1f} kick per sekund.")
+    log(f"  Energi {'lav' if mean_e < 0.4 else 'middels' if mean_e < 0.65 else 'høy'}, {len(A.drops)} drops, {len(A.breaks)} breaks, stemning: {cls}.")
+    log(f"  Klippene er {'rolige' if motion < 0.33 else 'middels aktive' if motion < 0.66 else 'svært aktive'} og {'ganske ulike' if diverse else 'ganske like'} i stil.")
+    log("  Valgte innstillinger: " + (", ".join(applied) if applied else "(alle var allerede satt av deg)"))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Lag beat-synkronisert musikkvideo av loop-videoer og en mp3.",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -649,16 +690,19 @@ def main():
     g.add_argument("--max-cut-beats", type=int, default=16, help="lengste klipp i beats (1,2,4,8,16)")
     g.add_argument("--min-cut-seconds", type=float, default=0.35, help="korteste klipp i sekunder")
     g.add_argument("--section-seconds", type=float, default=20.0, help="omtrentlig lengde på musikkdeler")
+    g.add_argument("--recommended", action="store_true",
+                   help="Recommended: analyserer musikk og videoer og velger klipping og effekter ut fra tempo, beat, stemning og bevegelse i klippene. Innstillinger du setter selv beholdes")
     g = ap.add_argument_group("Matching")
     g.add_argument("--randomness", type=float, default=0.35, help="0.05 = deterministisk, 1 = veldig tilfeldig")
     g.add_argument("--continuity", type=float, default=0.4, help="+ = like klipp etter hverandre, − = kontraster")
     g.add_argument("--pool-size", type=int, default=0, help="antall videoer per musikkgruppe (0 = auto)")
-    g.add_argument("--clip", action="store_true", help="bruk CLIP (AI-modell) til visuell likhet")
+    g.add_argument("--clip", action=argparse.BooleanOptionalAction, default=True,
+                   help="bruk CLIP (AI-modell) til visuell likhet; på som standard, slå av med --no-clip. Hvis CLIP ikke er installert fortsetter programmet uten")
     g.add_argument("--theme", default="", help="tekst-tema, f.eks. 'neon city at night' (krever CLIP)")
     g.add_argument("--seed", type=int, default=None)
     g = ap.add_argument_group("Utdata")
     g.add_argument("--resolution", default="1920x1080")
-    g.add_argument("--fps", type=int, default=30)
+    g.add_argument("--fps", type=int, default=60)
     g.add_argument("--crf", type=int, default=18)
     g.add_argument("--preset", default="veryfast")
     g.add_argument("--drop-flash", action="store_true", help="hvit flash på drops")
@@ -679,8 +723,9 @@ def main():
     g.add_argument("--shake-on", choices=["beat", "bar", "kick"], default="kick")
     g.add_argument("--pulse", type=float, default=0.0, help="lysstyrke-puls (f.eks. 0.12)")
     g.add_argument("--pulse-on", choices=["beat", "bar", "kick"], default="kick")
-    g.add_argument("--pulse-mode", choices=["light", "dark"], default="light", help="lysere eller mørkere puls")
+    g.add_argument("--pulse-mode", choices=["light", "dark"], default="dark", help="lysere eller mørkere puls")
     a = ap.parse_args()
+    defaults = {k: ap.get_default(k) for k in vars(a)}
     presets = {
         "subtle": dict(crossfade=0.2, zoom=0.03, pulse=0.06),
         "punchy": dict(crossfade=0.12, zoom=0.05, shake=0.008, pulse=0.12),
@@ -718,17 +763,26 @@ def main():
         normalize_videos(vids)
         theme = np.zeros(len(vids))
         if a.clip:
-            log("Kjører CLIP …")
-            emb = ClipEmbedder()
-            for v in vids:
-                v.emb = emb.images(v.frames)
-            if a.theme:
-                t = emb.text(a.theme)
-                s = np.array([float(v.emb @ t) for v in vids])
-                theme = np.clip((s - s.mean()) / (s.std() + 1e-6), -2, 2) / 2
+            try:
+                log("Kjører CLIP …")
+                emb = ClipEmbedder()
+                for v in vids:
+                    v.emb = emb.images(v.frames)
+                if a.theme:
+                    t = emb.text(a.theme)
+                    s = np.array([float(v.emb @ t) for v in vids])
+                    theme = np.clip((s - s.mean()) / (s.std() + 1e-6), -2, 2) / 2
+            except Exception as e:
+                log(f"  CLIP kunne ikke brukes ({e}). Fortsetter uten CLIP (slå av med --no-clip, eller installer: pip install torch transformers pillow).")
+                a.clip = False
+                theme = np.zeros(len(vids))
+                for v in vids:
+                    v.emb = None
         for v in vids:
             log(f"  {v.name}: {v.duration:.1f}s, energi {v.energy:.2f}")
         sim = similarity_matrix(vids)
+        if a.recommended:
+            recommend_cli(A, vids, sim, a, defaults)
 
         log("Lager klippeplan …")
         slots = plan_cuts(A, a, rng)

@@ -86,6 +86,8 @@ The server has no password. Keep the default `127.0.0.1` unless you trust everyo
 - **Export queue, no preview:** add one or more exports (up to 10 versions with different seeds), and they render one after another. Every job shows status, progress, time left, a live thumbnail, a timeline of the plan (sections, shots, layers) and how many loops were used. You can **pause, resume, stop** (the part already rendered is kept), cancel, reorder waiting jobs, re-run with a new seed, and download the result.
 - **MP4 export:** browsers that can record H.264 (Chrome and Edge on Windows/macOS, Safari) save a real `.mp4`. Browsers record MP4 as a *fragmented* file without a total duration (players then show a negative time and stop after a few seconds), so the app rewrites every finished MP4 into a regular MP4 with correct duration and seeking, without re-encoding (the *Finalizing* step). Other browsers can only record WebM; the app then shows the one-line ffmpeg command to convert it.
 - **Chill by default:** shots last 8 bars (about 16 s at 120 BPM), crossfades are 8 beats long, and there is a slow breathing zoom. Moods (Ambient, Chill, Groove, Energetic) set everything at once.
+- **Recommended mood:** next to Ambient, Chill, Groove and Energetic there is a **Recommended** button. With music and loops added, it analyses both (tempo, beat steadiness, energy, drops and breaks, kick density, how much the loops move and how alike they look) and fills in the settings, with a short explanation of why. You can adjust everything afterwards.
+- **Defaults:** CLIP is on (if it cannot load, the export carries on without it and says so on the job card), the frame rate is 60 fps and the brightness pulse type is dark.
 - **Sets of similar loops:** each section gets 2-4 loops of a similar style that alternate slowly. Sections that sound alike reuse the same loops, and a set can slowly evolve.
 - **Every loop is used:** *Use every loop* adds not-yet-used loops as short layers on top of the longer shots, so a 10-minute mix can show all 100 loops without fast cutting. The queue shows "N/100 loops used".
 - **VJ-style layers and looks** (inspired by Resolume, Visualz and VIDIFOLD): second-clip layers with blend modes (screen, add, overlay, soft-light, lighten, difference), a colour tint per song section, optional mirror, echo trails, slow motion in calm parts, and music reactivity that makes layers, tint and breathing swell with the loudness.
@@ -122,6 +124,7 @@ These control how often the picture changes. All cuts land on the beat grid.
 | `--max-cut-beats` | `16` | Longest allowed shot in beats (1, 2, 4, 8, 16). Use `8` to avoid long static shots in breaks. |
 | `--min-cut-seconds` | `0.35` | Shots shorter than this are lengthened. Matters at high BPM, where a single beat can be very short. Lower it for frantic cutting, raise it for calmer results. |
 | `--section-seconds` | `20.0` | Approximate length of the song sections the analysis looks for. Smaller values find more, shorter sections (more changes of look), larger values find fewer. Sections are snapped to bar lines and are at least 8 beats long. |
+| `--recommended` | off | **Recommended:** analyses the music (tempo, beat steadiness, energy, drops, kick density) and your loops (how much they move, how alike they look) and picks cutting and effects for you, in the spirit of the Ambient / Chill / Groove / Energetic moods. It prints what it found and which settings it chose. Anything you set yourself on the command line is kept. |
 
 How shot lengths are chosen:
 
@@ -140,7 +143,7 @@ These control which loop is used where.
 | `--randomness` | `0.35` | How adventurous the loop choice is. `0.05` always picks the best match (predictable), `1` picks almost freely. |
 | `--continuity` | `0.4` | How much the next shot should look like the previous one. Positive values favour smooth visual flow, `0` ignores it, negative values favour contrast between consecutive shots. |
 | `--pool-size` | `0` (auto) | How many loops each group of similar song sections may draw from. Smaller means each part of the song has a stricter, more recognisable look. `0` picks a value from the number of loops and song groups. |
-| `--clip` | off | Use the CLIP AI model to judge what the loops actually show (instead of only colour and motion) when computing visual similarity. Needs `torch`, `transformers`, `pillow`. Slower to start, noticeably better continuity with varied footage. |
+| `--clip` / `--no-clip` | **on** | Use the CLIP AI model to judge what the loops actually show (instead of only colour and motion) when computing visual similarity. Needs `torch`, `transformers`, `pillow`; if they are missing, Munken Loops prints a note and continues without CLIP. Turn it off with `--no-clip` for a faster start. Slower to start, noticeably better continuity with varied footage. |
 | `--theme TEXT` | none | A text prompt such as `"neon city at night"`. Loops that match the text get a bonus. Implies `--clip`. Works best with short, concrete descriptions in English. |
 | `--seed N` | random | Seed for all random choices. The seed is printed on every run. Reuse it to reproduce a result exactly, change it to get a different variation of the same settings. |
 
@@ -151,7 +154,7 @@ Loop energy is measured as motion in the picture. Calm sections of the song pref
 | Parameter | Default | Description |
 |---|---|---|
 | `--resolution` | `1920x1080` | Output size as `WIDTHxHEIGHT`, for example `3840x2160` or `1080x1920`. Loops are scaled to fill the frame and centre-cropped (no black bars). Odd numbers are rounded down to even. |
-| `--fps` | `30` | Output frame rate. Cuts are placed on exact frame numbers. |
+| `--fps` | `60` | Output frame rate. Cuts are placed on exact frame numbers. 60 gives the smoothest motion and fades but takes longer to render; use `30` for faster renders. |
 | `--crf` | `18` | H.264 quality. Lower is better and larger: 14-18 is high quality, 23 is the x264 default. |
 | `--preset` | `veryfast` | x264 speed preset: `ultrafast`, `superfast`, `veryfast`, `faster`, `fast`, `medium`, `slow`, `slower`, `veryslow`. Slower presets give smaller files at the same quality. |
 | `--drop-flash` | off | A quick white flash (0.25 s fade-in from white) on the first shot of every drop. |
@@ -179,7 +182,7 @@ All effects are **off by default**. Each effect pulses at a trigger and then fad
 | `--shake-on` | `kick` | Trigger for the shake: `beat`, `bar` or `kick`. |
 | `--pulse` | `0.0` (off) | Brightness pulse strength (0-1). Typical values: 0.06-0.2. Decays in about 0.1 s. |
 | `--pulse-on` | `kick` | Trigger for the pulse: `beat`, `bar` or `kick`. |
-| `--pulse-mode` | `light` | `light` flashes brighter on the trigger, `dark` dips darker. |
+| `--pulse-mode` | `dark` | `dark` dips darker on the trigger, `light` flashes brighter. |
 
 Details:
 
@@ -209,7 +212,7 @@ Presets fill in effects you have not set yourself.
 Examples:
 
 ```bash
-./munkenloops.py track.mp3 loops/ --fx-preset punchy --pulse-mode dark     # preset, but dark pulses
+./munkenloops.py track.mp3 loops/ --fx-preset punchy --pulse-mode light    # preset, but light pulses
 ./munkenloops.py track.mp3 loops/ --fx-preset wild --zoom 0.05             # preset, weaker zoom
 ```
 
@@ -313,7 +316,7 @@ Each run writes `<output>_plan.json` next to the output video:
 
 **Out of memory or disk.** Lower `--jobs`. Temporary files are stored in `/tmp` and can become large with many 4K loops; the folder is removed when the run finishes.
 
-**`--clip` fails to import.** Install the optional packages: `pip install torch transformers pillow`.
+**`--clip` could not run.** CLIP is on by default. If `torch`, `transformers` or `pillow` are missing (or the model cannot be downloaded), Munken Loops says so and continues without CLIP. Install them with `pip install torch transformers pillow`, or use `--no-clip`.
 
 ## Publish the site
 

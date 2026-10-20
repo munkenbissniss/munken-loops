@@ -15,6 +15,7 @@ EXT = {"audio": {".mp3", ".wav", ".flac", ".m4a", ".ogg"}, "video": {".mp4", ".m
 ON = ["beat", "bar", "kick"]
 def P(key, group, label, typ, default, help="", **kw): return dict(key=key, group=group, label=label, type=typ, default=default, help=help, **kw)
 SCHEMA = [
+ P("recommended","Klipping","Recommended (automatisk valg)","bool",False,"Analyserer musikk og videoer (tempo, beat, stemning, bevegelse i klippene) og velger klipping og effekter. Det du endrer selv beholdes."),
  P("intensity","Klipping","Intensitet","range",1.0,"Høyere = raskere klipping.",min=0.5,max=2,step=0.05),
  P("min_cut_beats","Klipping","Korteste klipp (beats)","select",1,"",options=[1,2,4,8,16]),
  P("max_cut_beats","Klipping","Lengste klipp (beats)","select",16,"",options=[1,2,4,8,16]),
@@ -23,7 +24,7 @@ SCHEMA = [
  P("randomness","Matching","Tilfeldighet","range",0.35,"Lav = forutsigbart, høy = fritt.",min=0.05,max=1,step=0.05),
  P("continuity","Matching","Kontinuitet","range",0.4,"Positiv = like klipp etter hverandre, negativ = kontraster.",min=-1,max=1,step=0.05),
  P("pool_size","Matching","Videoer per musikkgruppe","range",0,"0 = automatisk.",min=0,max=12,step=1),
- P("clip","Matching","Bruk CLIP (AI-bildeforståelse)","bool",False,"Krever torch, transformers og pillow."),
+ P("clip","Matching","Bruk CLIP (AI-bildeforståelse)","bool",True,"På som standard. Krever torch, transformers og pillow. Mangler de, fortsetter programmet uten CLIP."),
  P("theme","Matching","Tema (engelsk tekst)","text","","F.eks. neon city at night. Slår på CLIP."),
  P("seed","Matching","Seed (tom = tilfeldig)","number","","Samme seed gir samme resultat."),
  P("crossfade","Effekter","Crossfade (sek)","range",0,"Bare i rolige partier. 0 = av.",min=0,max=0.5,step=0.05),
@@ -34,10 +35,10 @@ SCHEMA = [
  P("shake_on","Effekter","Shake på","select","kick","",options=ON),
  P("pulse","Effekter","Lysstyrke-puls","range",0,"0 = av.",min=0,max=0.3,step=0.01),
  P("pulse_on","Effekter","Puls på","select","kick","",options=ON),
- P("pulse_mode","Effekter","Pulstype","select","light","",options=["light","dark"]),
+ P("pulse_mode","Effekter","Pulstype","select","dark","",options=["light","dark"]),
  P("drop_flash","Effekter","Hvit flash på drops","bool",False),
  P("resolution","Utdata","Oppløsning","select","1920x1080","",options=["1280x720","1920x1080","2560x1440","3840x2160","1080x1920"]),
- P("fps","Utdata","Bilder per sekund","select",30,"",options=[24,25,30,50,60]),
+ P("fps","Utdata","Bilder per sekund","select",60,"",options=[24,25,30,50,60]),
  P("crf","Utdata","Kvalitet (CRF, lavere = bedre)","range",18,"",min=12,max=28,step=1),
  P("preset","Utdata","Hastighet (x264)","select","veryfast","Tregere = mindre fil.",options=["ultrafast","veryfast","fast","medium","slow"]),
  P("audio_offset","Utdata","Forskyv klipp (sek)","range",0,"+ = senere, − = tidligere.",min=-0.2,max=0.2,step=0.005),
@@ -68,6 +69,7 @@ def build_args(params, test, plan_only):
         flag = "--" + key.replace("_", "-")
         if p["type"] == "bool":
             if v is True: args.append(flag)
+            elif key == "clip" and v is False: args.append("--no-clip")
         elif p["type"] == "text": args += [flag, str(v).strip()[:200]]
         elif p["type"] == "select":
             if str(v) not in [str(o) for o in p["options"]]: raise ValueError(key)

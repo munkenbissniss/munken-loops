@@ -106,7 +106,8 @@ pip install torch transformers pillow</pre>
     <tr><td><code>--randomness</code></td><td>0.05 is nearly deterministic, 1 is wild.</td></tr>
     <tr><td><code>--continuity</code></td><td>Positive: similar shots follow each other. Negative: contrast.</td></tr>
     <tr><td><code>--pool-size</code></td><td>Number of loops per song section group.</td></tr>
-    <tr><td><code>--clip</code>, <code>--theme</code></td><td>Use CLIP for visual similarity, and favour loops matching a text prompt.</td></tr>
+    <tr><td><code>--clip</code> / <code>--no-clip</code>, <code>--theme</code></td><td>CLIP is on by default and is used for visual similarity (turn it off with <code>--no-clip</code>). <code>--theme</code> favours loops matching a text prompt.</td></tr>
+    <tr><td><code>--recommended</code></td><td>Analyses the music and the loops and picks cutting and effects for you. Your own settings are kept.</td></tr>
     <tr><td><code>--fx-preset</code></td><td><code>subtle</code>, <code>punchy</code> or <code>wild</code>: ready-made effect sets.</td></tr>
     <tr><td><code>--crossfade</code></td><td>Dissolve between shots in calm parts (seconds, max 0.5). Intense parts and drops keep hard cuts.</td></tr>
     <tr><td><code>--zoom</code>, <code>--shake</code>, <code>--pulse</code></td><td>Zoom, shake and brightness pulses that decay after each trigger. Choose the trigger with <code>--zoom-on</code>, <code>--shake-on</code>, <code>--pulse-on</code> (<code>beat</code>, <code>bar</code> or <code>kick</code>), and <code>--pulse-mode light|dark</code>.</td></tr>
