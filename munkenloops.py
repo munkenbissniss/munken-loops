@@ -617,9 +617,20 @@ def render(slots, vids, A, audio_path, out_path, a, workdir, end_time):
         for c in clips:
             f.write(f"file '{c}'\n")
     log("Setter sammen og legger på lyd …")
+    # The sound always comes straight from the original file. Picture and sound end together:
+    # if the rendered picture is a little shorter than the music, the sound is cut to match;
+    # if it is longer, the picture is cut at the end of the music.
+    vid_len = 0.0
+    try:
+        vid_len = sum(probe_duration(c) for c in clips)
+    except Exception:
+        pass
+    if vid_len > 0.5 and vid_len < end_time:
+        log(f"  Bildet er {end_time - vid_len:.2f} s kortere enn musikken - lyden kuttes til samme lengde.")
+        end_time = vid_len
     cmd = ["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst, "-i", audio_path,
-           "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",
-           "-t", f"{end_time:.3f}", "-movflags", "+faststart", out_path]
+           "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "320k", "-af", "aresample=async=1:first_pts=0",
+           "-shortest", "-t", f"{end_time:.3f}", "-movflags", "+faststart", out_path]
     run(cmd)
 
 
