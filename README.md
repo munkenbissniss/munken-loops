@@ -328,3 +328,13 @@ The site is then at `https://munkenbissniss.github.io/munken-loops/`, and the br
 ## License
 
 MIT
+
+## Loops from an iPhone (HEVC / H.265)
+
+iPhone videos (`IMG_xxxx.MP4`) are often HEVC. Many desktop Chrome installs cannot decode HEVC: the video loads but never shows a picture. The browser app skips such loops and tells you which ones. Convert them to H.264 first:
+
+```bash
+ffmpeg -i IMG_5207.MP4 -c:v libx264 -crf 18 -pix_fmt yuv420p -an IMG_5207_h264.mp4
+# or a whole folder
+for f in *.MP4; do ffmpeg -i "$f" -c:v libx264 -crf 18 -pix_fmt yuv420p -an "h264_${f%.*}.mp4"; done
+```

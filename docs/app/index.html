@@ -313,20 +313,20 @@ $('#fA').onchange=e=>setAudio(e.target.files[0]);$('#fV').onchange=e=>{addFiles(
 $('#redraw').onclick=drawPick;
 
 /* ---------------- loop analysis (and optional CLIP) ---------------- */
-const seek=(v,t)=>new Promise(r=>{const f=()=>{v.removeEventListener('seeked',f);r()};v.addEventListener('seeked',f);v.currentTime=Math.min(t,v.duration-.05)});
+const seek=(v,t)=>new Promise(r=>{let d=false;const f=()=>{if(d)return;d=true;v.removeEventListener('seeked',f);r(true)};v.addEventListener('seeked',f);setTimeout(()=>{if(!d){d=true;v.removeEventListener('seeked',f);r(false)}},3000);v.currentTime=Math.min(t,Math.max(0,v.duration-.05))});
 function hue(r,g,b){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;if(d<.08)return -1;let h=mx==r?((g-b)/d)%6:mx==g?(b-r)/d+2:(r-g)/d+4;return((h*60+360)%360)/60|0}
 async function analyzeLoop(f,vid,wantFrames){
  const url=URL.createObjectURL(f);vid.src=url;
  try{await Promise.race([new Promise((r,j)=>{vid.onloadedmetadata=r;vid.onerror=()=>j(new Error('unreadable'))}),sleep(30000).then(()=>{throw new Error('timeout')})]);
   const dur=vid.duration,n=clamp(Math.round(dur/6),6,16),dtp=Math.min(.3,dur/(n*3)),c=document.createElement('canvas');c.width=64;c.height=36;const g=c.getContext('2d',{willReadFrequently:true}),
-   c2=document.createElement('canvas');c2.width=c2.height=224;const g2=c2.getContext('2d',{willReadFrequently:true}),mot=[],acc=new Float64Array(13),frames=[];let thumb='';
-  for(let i=0;i<n;i++){const t=dur*(i+.5)/n;await seek(vid,t);g.drawImage(vid,0,0,64,36);const d=g.getImageData(0,0,64,36).data,gr=new Float32Array(2304);let R=0,G=0,B=0,sa=0,lu=0,lu2=0,ed=0;
+   c2=document.createElement('canvas');c2.width=c2.height=224;const g2=c2.getContext('2d',{willReadFrequently:true}),mot=[],acc=new Float64Array(13),frames=[];let thumb='',fail=0;const sk=async x=>{if(await seek(vid,x))fail=0;else if(++fail>=3)throw new Error('This video does not seek or decode in this browser')};
+  for(let i=0;i<n;i++){const t=dur*(i+.5)/n;await sk(t);g.drawImage(vid,0,0,64,36);const d=g.getImageData(0,0,64,36).data,gr=new Float32Array(2304);let R=0,G=0,B=0,sa=0,lu=0,lu2=0,ed=0;
    for(let p=0;p<2304;p++){const r=d[p*4]/255,gg=d[p*4+1]/255,b=d[p*4+2]/255,l=.3*r+.59*gg+.11*b;gr[p]=l;R+=r;G+=gg;B+=b;lu+=l;lu2+=l*l;const mx=Math.max(r,gg,b),mn=Math.min(r,gg,b);sa+=mx?(mx-mn)/mx:0;
     if(p%64)ed+=Math.abs(l-gr[p-1]);const h=hue(r,gg,b);if(h>=0)acc[7+h]+=mx-mn}
    acc[0]+=R/2304/n;acc[1]+=G/2304/n;acc[2]+=B/2304/n;acc[3]+=sa/2304/n;acc[4]+=lu/2304/n;acc[5]+=Math.sqrt(Math.max(0,lu2/2304-(lu/2304)**2))/n;acc[6]+=ed/2304/n;
    if(i==Math.floor(n/2))thumb=c.toDataURL('image/jpeg',.6);
    if(wantFrames&&[.15,.5,.85].some(q=>i==Math.round(q*(n-1)))){g2.drawImage(vid,0,0,224,224);frames.push(g2.getImageData(0,0,224,224))}
-   await seek(vid,t+dtp);g.drawImage(vid,0,0,64,36);const d2=g.getImageData(0,0,64,36).data;let m=0;for(let p=0;p<2304;p++)m+=Math.abs((.3*d2[p*4]+.59*d2[p*4+1]+.11*d2[p*4+2])/255-gr[p]);mot.push(m/2304)}
+   await sk(t+dtp);g.drawImage(vid,0,0,64,36);const d2=g.getImageData(0,0,64,36).data;let m=0;for(let p=0;p<2304;p++)m+=Math.abs((.3*d2[p*4]+.59*d2[p*4+1]+.11*d2[p*4+2])/255-gr[p]);mot.push(m/2304)}
   const hs=acc.slice(7,13).reduce((a,b)=>a+b,0)||1,mm=mean(mot,0,mot.length),ms=Math.sqrt(mean(mot.map(x=>(x-mm)**2),0,mot.length));
   return{file:f,name:f.name,dur,mm,v:[...acc.slice(0,7),...Array.from(acc.slice(7,13),x=>x/hs),mm,ms],thumb,frames};
  }finally{URL.revokeObjectURL(url)}
@@ -347,15 +347,15 @@ const loopCache=new Map();
 async function loopsFor(files,o,msg){
  const need=files.filter(f=>{const c=loopCache.get(fkey(f));return !c||(o.clip&&!c.bad&&!c.emb)});
  if(need.length){const vids=[0,1,2].map(()=>{const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';v.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';document.body.append(v);return v});
-  let next=0,done=0;await Promise.all(vids.map(async v=>{for(;;){const i=next++;if(i>=need.length)break;const f=need[i];try{loopCache.set(fkey(f),await analyzeLoop(f,v,o.clip))}catch(e){loopCache.set(fkey(f),{bad:true,name:f.name})}msg(`Analyzing loops ${++done}/${need.length}…`)}}));vids.forEach(v=>v.remove())}
- const L=files.map(f=>loopCache.get(fkey(f))).filter(c=>c&&!c.bad),bad=files.length-L.length;
+  let next=0,done=0;msg(`Analyzing loops 0/${need.length}…`);await Promise.all(vids.map(async v=>{for(;;){const i=next++;if(i>=need.length)break;const f=need[i];try{loopCache.set(fkey(f),await Promise.race([analyzeLoop(f,v,o.clip),sleep(120000).then(()=>{throw new Error('timeout')})]))}catch(e){loopCache.set(fkey(f),{bad:true,name:f.name})}msg(`Analyzing loops ${++done}/${need.length}…`)}}));vids.forEach(v=>v.remove())}
+ const L=files.map(f=>loopCache.get(fkey(f))).filter(c=>c&&!c.bad),bad=files.length-L.length,badNames=files.filter(f=>{const c=loopCache.get(fkey(f));return !c||c.bad}).map(f=>f.name);
  if(!L.length)throw new Error('None of the videos could be read by this browser (try H.264 mp4).');
  L.forEach(l=>{l.theme=null});
- if(o.clip){const C=await loadClip(msg);let k=0;for(const l of L)if(!l.emb){msg(`CLIP: looking at loop ${++k}/${L.length}…`);l.emb=await C.img(l.frames);l.frames=[]}
+ if(o.clip){const C=await Promise.race([loadClip(msg),sleep(240000).then(()=>{throw new Error('the model took too long to load')})]);let k=0;for(const l of L)if(!l.emb){msg(`CLIP: looking at loop ${++k}/${L.length}…`);l.emb=await C.img(l.frames);l.frames=[]}
   if(o.theme.trim()){const t=await C.txt(o.theme.trim());L.forEach(l=>l.theme=l.emb.reduce((s,x,i)=>s+x*t[i],0))}}
- return{L,bad};
+ return{L,bad,badNames};
 }
-$('#anaL').onclick=async()=>{try{const o=getO(),{L,bad}=await loopsSafe(pick,o,st);$('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');st(`${L.length} loops analyzed${bad?` (${bad} could not be read)`:''}.`)}catch(e){st(e.message,1)}};
+$('#anaL').onclick=async()=>{try{const o=getO(),{L,bad,badNames}=await loopsSafe(pick,o,st);$('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');st(`${L.length} loops analyzed${bad?` (${bad} could not be read: ${(badNames||[]).slice(0,4).join(', ')}${bad>4?', …':''})`:''}.`)}catch(e){st(e.message,1)}};
 
 async function loopsSafe(files,o,msg){
  try{const r=await loopsFor(files,o,msg);return{...r,useClip:!!o.clip}}
@@ -602,7 +602,7 @@ async function runQueue(){if(running)return;running=true;
 async function doJob(j){
  const o=j.o,msg=m=>{j.msg=m;upd(j)};j.status='preparing';msg('Preparing…');
  const A=await getAudio(j.audio,o.secLen,msg);curA=A;paceTxt();j.dur=A.dur;if(j.cancel)throw new Error('Cancelled');
- const {L,bad,useClip,note}=await loopsSafe(j.files,o,msg);if(note)j.note=note;if(j.cancel)throw new Error('Cancelled');
+ const {L,bad,badNames,useClip,note}=await loopsSafe(j.files,o,msg);j.note=(note||'')+(bad?` ${bad} loop${bad>1?'s were':' was'} skipped because this browser cannot read ${bad>1?'them':'it'}: ${badNames.slice(0,4).join(', ')}${bad>4?', …':''}. Try converting to H.264 mp4.`:'');if(j.cancel)throw new Error('Cancelled');
  $('#thumbs').innerHTML=L.map(l=>`<img src="${l.thumb}" title="${l.name.replace(/"/g,'')}">`).join('');
  const S=normLoops(L,useClip?.7:0),P=plan(A,L,S,o,mkrng(o.seed));
  j.info=`${A.tempo.toFixed(0)} BPM · ${P.slots.length} shots · ${A.sections.length} sections · ${P.coverage.used}/${P.coverage.total} loops used${useClip?' · CLIP':''}${bad?` · ${bad} unreadable`:''}`;
