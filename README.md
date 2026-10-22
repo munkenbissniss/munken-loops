@@ -338,3 +338,7 @@ ffmpeg -i IMG_5207.MP4 -c:v libx264 -crf 18 -pix_fmt yuv420p -an IMG_5207_h264.m
 # or a whole folder
 for f in *.MP4; do ffmpeg -i "$f" -c:v libx264 -crf 18 -pix_fmt yuv420p -an "h264_${f%.*}.mp4"; done
 ```
+
+## Upload straight to Vimeo (optional)
+
+Open **Upload to Vimeo (optional)** in the app, paste a personal access token and choose who can watch. Create the token at developer.vimeo.com (Create an app, then Generate an access token with the scopes `upload`, `edit` and `private`). Optionally add a showcase number to put every upload in that showcase. When a video is finished, press **Upload to Vimeo**. The file goes from your browser straight to Vimeo (resumable upload in 16 MB parts, with retries); there is no server in between. The token is stored only in your browser. Your Vimeo plan's upload quota applies. Tested against a simulated Vimeo server; if your browser blocks the direct calls, download the video and upload it on vimeo.com instead.

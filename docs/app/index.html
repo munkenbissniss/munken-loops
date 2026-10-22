@@ -57,6 +57,11 @@ details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;fo
 <div class="card"><h2>Queue</h2>
  <div id="sum"></div>
  <div class="bar" style="margin-bottom:10px"><button class="sm" id="qpause" disabled>Pause</button><button class="sm" id="qstop" disabled>Stop current</button><button class="sm" id="qclear">Clear finished</button></div>
+<details id="vimeoBox"><summary>Upload to Vimeo (optional)</summary><div class="small" style="display:grid;gap:8px;margin:8px 0">
+ <label>Access token <input id="vtok" type="password" autocomplete="off" placeholder="Paste your personal Vimeo access token" style="width:100%"></label>
+ <label>Who can watch <select id="vpriv"><option value="unlisted">Only with the link (unlisted)</option><option value="nobody">Only me (private)</option><option value="anybody">Everyone (public)</option></select></label>
+ <label>Showcase number (optional) <input id="valb" inputmode="numeric" placeholder="for example 12463997" style="width:100%"></label>
+ <span class="mute">Create the token at developer.vimeo.com (Create an app, then Generate an access token with the scopes <b>upload</b>, <b>edit</b> and <b>private</b>). It is stored only in this browser and sent only to Vimeo. Each finished video gets an <b>Upload to Vimeo</b> button.</span></div></details>
  <div id="queue"><p class="mute">The queue is empty.</p></div>
  <p class="mute" style="font-size:.85rem">Export runs in real time, so a 10-minute track takes about 10 minutes. Keep this tab open while exporting. No sound plays. Finished files stay in this browser until you download or remove them.</p></div>
 </div>
@@ -373,6 +378,28 @@ async function openSink(name){let w=null,root=null,fh=null;try{root=await naviga
  return{write(b){p=p.then(()=>w?w.write(b):void mem.push(b))},async close(){await p;if(w){await w.close();return fh.getFile()}return new Blob(mem,{type:MIME})},async remove(){try{root&&await root.removeEntry(name)}catch(e){}}}}
 const tickW=new Worker(URL.createObjectURL(new Blob(['let id;onmessage=e=>{clearInterval(id);if(e.data)id=setInterval(()=>postMessage(0),1000/e.data)}'])));
 
+/* VIMEO:START — optional upload of a finished video straight from the browser to your own Vimeo account (tus resumable upload). The access token is only kept in this browser. */
+const VK='munken_vimeo',vcfg=()=>{try{return JSON.parse(localStorage.getItem(VK)||'{}')}catch(e){return{}}},vsave=c=>{try{localStorage.setItem(VK,JSON.stringify(c))}catch(e){}};
+(()=>{const c=vcfg(),$$=id=>document.getElementById(id);if(!$$('vtok'))return;$$('vtok').value=c.token||'';$$('vpriv').value=c.privacy||'unlisted';$$('valb').value=c.album||'';
+ const sv=()=>vsave({token:$$('vtok').value.trim(),privacy:$$('vpriv').value,album:$$('valb').value.replace(/\D/g,'')});['vtok','vpriv','valb'].forEach(i=>$$(i).addEventListener('change',sv))})();
+async function vimeoUp(j){
+ const c=vcfg();if(!c.token){j.note='Paste your Vimeo access token under "Upload to Vimeo (optional)" first.';const d=document.getElementById('vimeoBox');if(d){d.open=true;d.scrollIntoView({block:'center'})}upd(j);return}
+ if(j.vim&&j.vim.busy||!j.file)return;j.vim={busy:true};const f=j.file,H={Authorization:'bearer '+c.token,Accept:'application/vnd.vimeo.*+json;version=3.4'},say=m=>{j.note=m;upd(j)};
+ const err=async r=>{let t='';try{const e=await r.json();t=e.developer_message||e.error||''}catch(e){}return `Vimeo said ${r.status}${t?': '+t:''}`+(r.status==401||r.status==403?'. Check that the token has the scopes upload, edit and private.':'')};
+ try{
+  say('Vimeo: creating the video…');
+  const r=await fetch('https://api.vimeo.com/me/videos',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({upload:{approach:'tus',size:f.size},name:j.name,description:`Made with Munken Loops. ${j.audio?j.audio.name:''}`.trim(),privacy:{view:c.privacy||'unlisted'}})});
+  if(!r.ok)throw new Error(await err(r));
+  const d=await r.json(),link=d.upload.upload_link,CH=16*1024*1024;let off=0,tries=0;
+  while(off<f.size){const end=Math.min(f.size,off+CH);
+   try{const p=await fetch(link,{method:'PATCH',headers:{'Tus-Resumable':'1.0.0','Upload-Offset':String(off),'Content-Type':'application/offset+octet-stream'},body:f.slice(off,end)});
+    if(!p.ok)throw new Error('Upload part failed ('+p.status+')');off=+p.headers.get('Upload-Offset')||end;tries=0;say(`Vimeo: uploading ${Math.round(100*off/f.size)} % (${(off/1e6).toFixed(0)} of ${(f.size/1e6).toFixed(0)} MB)…`)}
+   catch(e){if(++tries>4)throw e;await new Promise(r=>setTimeout(r,2000*tries));try{const h=await fetch(link,{method:'HEAD',headers:{'Tus-Resumable':'1.0.0'}});if(h.ok)off=+h.headers.get('Upload-Offset')||off}catch(_){}}}
+  const id=d.uri.split('/').pop();let extra='';
+  if(c.album){try{const a=await fetch(`https://api.vimeo.com/me/albums/${c.album}/videos/${id}`,{method:'PUT',headers:H});extra=a.ok?' Added to your showcase.':' It could not be added to the showcase ('+a.status+').'}catch(e){extra=' It could not be added to the showcase.'}}
+  j.vlink=d.link;j.vim={busy:false,done:true};say('Uploaded to Vimeo. Vimeo is now processing it, which can take a few minutes.'+extra)
+ }catch(e){j.vim={busy:false};say('Vimeo upload failed: '+(e.message||e)+'. Press the button to try again.')}}
+/* VIMEO:END */
 /* REMUX:START — rewrites a fragmented MP4 (as made by MediaRecorder) into a regular MP4 with correct duration, index and seeking. No re-encoding.
    With opts.mp3 the recorded (and possibly stretched) audio is dropped and the ORIGINAL MP3 frames are put in as the audio track, sample exact.
    The picture is then lined up with it: opts.lead = seconds from the start of the recording to music time 0, opts.expected = seconds of music that were rendered.
@@ -571,7 +598,7 @@ function card(j){const d=document.createElement('div');d.className='job';
  d.innerHTML=`<div class="jh"><b class="jn"></b><span class="chip"></span></div><div class="mute jm"></div><div class="jb"><canvas class="jt" width="192" height="108"></canvas><div class="jr"><div class="prog"><i></i></div><div class="mute jp"></div><canvas class="jl" width="700" height="44"></canvas><div class="acts"></div><div class="mute jf"></div></div></div>`;
  j.tctx=d.querySelector('.jt').getContext('2d');j.lctx=d.querySelector('.jl').getContext('2d');j.el=d;d.onclick=e=>{const a=e.target.dataset.a;if(!a)return;
   if(a=='pause')j.status=='paused'?j.ctl.resume():j.ctl.pause();if(a=='stop'){if(j.ctl&&(j.status=='rendering'||j.status=='paused'))j.ctl.stop();else if(j.status=='waiting'||j.status=='preparing'){j.cancel=true;j.status=j.status=='waiting'?'stopped':j.status;upd(j)}}
-  if(a=='rm')rmJob(j);if(a=='again')addJob(j.audio,j.files,{...j.o,seed:Math.floor(Math.random()*1e9)},j.name.replace(/ #\d+$/,'')+' (again)');if(a=='up'){const i=jobs.indexOf(j);if(i>0&&jobs[i-1].status=='waiting'){[jobs[i-1],jobs[i]]=[jobs[i],jobs[i-1]];order()}}};
+  if(a=='vimeo')vimeoUp(j);if(a=='rm')rmJob(j);if(a=='again')addJob(j.audio,j.files,{...j.o,seed:Math.floor(Math.random()*1e9)},j.name.replace(/ #\d+$/,'')+' (again)');if(a=='up'){const i=jobs.indexOf(j);if(i>0&&jobs[i-1].status=='waiting'){[jobs[i-1],jobs[i]]=[jobs[i],jobs[i-1]];order()}}};
  return d}
 const CH={waiting:'Waiting',preparing:'Preparing',finalizing:'Finalizing',rendering:'Rendering',paused:'Paused',done:'Done',failed:'Failed',stopped:'Stopped'};
 function upd(j){const d=j.el;if(!d)return;const q=s=>d.querySelector(s);q('.jn').textContent=j.name;const ch=q('.chip');ch.textContent=CH[j.status];ch.className='chip '+j.status;
@@ -580,7 +607,7 @@ function upd(j){const d=j.el;if(!d)return;const q=s=>d.querySelector(s);q('.jn')
  q('.jp').textContent=j.msg||(dur?`${fmtT(j.prog*dur)} / ${fmtT(dur)}${live?` · about ${fmtT(dur*(1-j.prog))} left`:''}`:(j.status=='waiting'?'In the queue':''));
  const act=q('.acts'),b=(a,t,m)=>`<button class="sm ${m||''}" data-a="${a}">${t}</button>`;
  let h='';if(live)h+=b('pause',j.status=='paused'?'Resume':'Pause')+b('stop','Stop (keep what is done)');else if(j.status=='waiting')h+=b('up','Move up')+b('stop','Cancel')+b('rm','Remove');else if(j.status=='preparing')h+=b('stop','Cancel');
- else if(j.status!='finalizing'){if(j.url)h+=`<a class="btn sm main" href="${j.url}" download="${j.name.replace(/[^\w\-. ]+/g,'_')}.${EXT}">Download ${EXT.toUpperCase()}${j.file?' ('+(j.file.size/1e6).toFixed(0)+' MB)':''}</a>`;h+=b('again','Again, new seed')+b('rm','Remove')}
+ else if(j.status!='finalizing'){if(j.url)h+=`<a class="btn sm main" href="${j.url}" download="${j.name.replace(/[^\w\-. ]+/g,'_')}.${EXT}">Download ${EXT.toUpperCase()}${j.file?' ('+(j.file.size/1e6).toFixed(0)+' MB)':''}</a>`;if(j.vlink)h+=`<a class="btn sm" href="${j.vlink}" target="_blank" rel="noopener">Open on Vimeo</a>`;else if(j.url&&j.file)h+=j.vim&&j.vim.busy?'<button class="sm" disabled>Uploading to Vimeo…</button>':b('vimeo','Upload to Vimeo');h+=b('again','Again, new seed')+b('rm','Remove')}
  if(act.dataset.h!=h){act.innerHTML=h;act.dataset.h=h}
  q('.jf').textContent=j.status=='failed'?j.err:(j.status=='stopped'&&j.url?'Stopped early. The part that was rendered can still be downloaded.':'')+(j.note?' '+j.note:'');
  q('.jt').style.display=live||j.status=='done'||j.status=='stopped'?'':'none';summary()}
