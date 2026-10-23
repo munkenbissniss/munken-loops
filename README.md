@@ -342,3 +342,7 @@ for f in *.MP4; do ffmpeg -i "$f" -c:v libx264 -crf 18 -pix_fmt yuv420p -an "h26
 ## Upload straight to Vimeo (optional)
 
 Open **Upload to Vimeo (optional)** in the app, paste a personal access token and choose who can watch. Create the token at developer.vimeo.com (Create an app, then Generate an access token with the scopes `upload`, `edit` and `private`). Optionally add a showcase number to put every upload in that showcase. When a video is finished, press **Upload to Vimeo**. The file goes from your browser straight to Vimeo (resumable upload in 16 MB parts, with retries); there is no server in between. The token is stored only in your browser. Your Vimeo plan's upload quota applies. Tested against a simulated Vimeo server; if your browser blocks the direct calls, download the video and upload it on vimeo.com instead.
+
+## Storage in the browser
+
+Videos are written to the browser's private storage while they are made, and kept there until you press **Remove** on them (download first). If the page is closed or reloaded in the middle of a run, the leftover files are deleted automatically the next time the page opens. Under **Storage in this browser** you can see how much space the page uses, delete everything it stored, or delete the downloaded AI model (it is cached in the browser and only downloaded again if you delete it or clear the browser's cached files).

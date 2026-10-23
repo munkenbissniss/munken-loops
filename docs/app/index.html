@@ -57,6 +57,10 @@ details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer;fo
 <div class="card"><h2>Queue</h2>
  <div id="sum"></div>
  <div class="bar" style="margin-bottom:10px"><button class="sm" id="qpause" disabled>Pause</button><button class="sm" id="qstop" disabled>Stop current</button><button class="sm" id="qclear">Clear finished</button></div>
+<details id="storBox"><summary>Storage in this browser</summary><div class="small" style="display:grid;gap:8px;margin:8px 0">
+ <span id="stInfo" class="mute">Checking…</span>
+ <span class="mute">Finished videos are kept inside this page until you press <b>Remove</b> on them, so download first. Videos left behind by an interrupted run are deleted automatically the next time the page opens.</span>
+ <div class="bar"><button class="sm" id="stClear">Delete all stored videos</button><button class="sm" id="stModel">Delete the AI model</button></div></div></details>
 <details id="vimeoBox"><summary>Upload to Vimeo (optional)</summary><div class="small" style="display:grid;gap:8px;margin:8px 0">
  <label>Access token <input id="vtok" type="password" autocomplete="off" placeholder="Paste your personal Vimeo access token" style="width:100%"></label>
  <label>Who can watch <select id="vpriv"><option value="unlisted">Only with the link (unlisted)</option><option value="nobody">Only me (private)</option><option value="anybody">Everyone (public)</option></select></label>
@@ -378,6 +382,15 @@ async function openSink(name){let w=null,root=null,fh=null;try{root=await naviga
  return{write(b){p=p.then(()=>w?w.write(b):void mem.push(b))},async close(){await p;if(w){await w.close();return fh.getFile()}return new Blob(mem,{type:MIME})},async remove(){try{root&&await root.removeEntry(name)}catch(e){}}}}
 const tickW=new Worker(URL.createObjectURL(new Blob(['let id;onmessage=e=>{clearInterval(id);if(e.data)id=setInterval(()=>postMessage(0),1000/e.data)}'])));
 
+/* ---------------- storage: remove recordings that are no longer needed ---------------- */
+async function purgeStore(){try{const r=await navigator.storage.getDirectory();const names=[];for await(const [n] of r.entries())names.push(n);for(const n of names)try{await r.removeEntry(n,{recursive:true})}catch(e){}}catch(e){}}
+async function stInfo(){let t='';try{const e=await navigator.storage.estimate();t=`This page uses ${e.usage>=1e9?(e.usage/1e9).toFixed(2)+' GB':Math.round(e.usage/1e6)+' MB'} in this browser.`}catch(e){t='Your browser does not report how much storage this page uses.'}$('#stInfo').textContent=t}
+const busyJobs=()=>jobs.some(j=>['rendering','paused','preparing','finalizing'].includes(j.status));
+$('#storBox').addEventListener('toggle',()=>{if($('#storBox').open)stInfo()});
+$('#stClear').onclick=async()=>{if(busyJobs()){$('#stInfo').textContent='Wait until the video that is being made is finished, or stop it first.';return}
+ if(!confirm('Delete all videos stored by this page? Download the ones you want first.'))return;jobs.slice().forEach(rmJob);await purgeStore();await stInfo()};
+$('#stModel').onclick=async()=>{try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}await stInfo();$('#stInfo').textContent+=' The AI model will be downloaded again the next time it is used (about 100–150 MB).'};
+(async()=>{let beat=0;try{beat=+localStorage.getItem('mm_beat')||0}catch(e){}if(Date.now()-beat>30000){await purgeStore();try{localStorage.removeItem('mm_beat')}catch(e){}}})();
 /* VIMEO:START — optional upload of a finished video straight from the browser to your own Vimeo account (tus resumable upload). The access token is only kept in this browser. */
 const VK='munken_vimeo',vcfg=()=>{try{return JSON.parse(localStorage.getItem(VK)||'{}')}catch(e){return{}}},vsave=c=>{try{localStorage.setItem(VK,JSON.stringify(c))}catch(e){}};
 (()=>{const c=vcfg(),$$=id=>document.getElementById(id);if(!$$('vtok'))return;$$('vtok').value=c.token||'';$$('vpriv').value=c.privacy||'unlisted';$$('valb').value=c.album||'';
@@ -557,7 +570,7 @@ function renderJob(j,A,L,P){
   let lastM=0;
   const rec=new MediaRecorder(new MediaStream([...cv.captureStream(o.fps).getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:MIME,videoBitsPerSecond:o.bitrate*1e6,audioBitsPerSecond:192000});
   rec.ondataavailable=e=>{if(e.data.size)sink.write(e.data)};
-  let ended=false;const finish=async why=>{if(ended)return;ended=true;tickW.postMessage(0);try{src.stop()}catch(e){}pool.forEach(p=>p.el.pause());
+  let ended=false;const finish=async why=>{if(ended)return;ended=true;tickW.postMessage(0);try{localStorage.removeItem('mm_beat')}catch(e){}try{src.stop()}catch(e){}pool.forEach(p=>p.el.pause());
    await new Promise(r=>{rec.onstop=r;if(rec.state!='inactive')rec.stop();else r()});let f=await sink.close();
    if(EXT=='mp4'){j.status='finalizing';j.msg='Fixing duration and seeking…';upd(j);
     try{const s2=await openSink(`${j.id}-fixed-${Date.now()}.mp4`);const ok=await fixMp4(f,s2,p=>{j.msg=`Fixing duration and seeking… ${Math.round(p*100)} %`;upd(j)},useMp3?{mp3:j.audio,lead:tS-tRec,expected:why=='done'?A.dur:lastM}:null);
@@ -581,7 +594,7 @@ function renderJob(j,A,L,P){
    if(look.mirror&&fx>.5){g.save();g.translate(W,0);g.scale(-1,1);g.drawImage(cv,0,0,W/2,H,0,0,W/2,H);g.restore()}
    for(const[lk,w]of[[pl,1-fx],[look,fx]])if(lk.tint>0&&w>.01){g.globalCompositeOperation='soft-light';g.fillStyle=`hsla(${lk.hue},80%,55%,${Math.min(1,lk.tint*react*w)})`;g.fillRect(0,0,W,H);g.globalCompositeOperation='source-over'}
    const pu=o.pulse*bo*env(T.pulse,m,10);if(pu>.002){g.fillStyle=o.pulseMode=='light'?`rgba(255,255,255,${pu})`:`rgba(0,0,0,${pu*2})`;g.fillRect(0,0,W,H)}
-   j.prog=m/A.dur;const now=performance.now();if(now-lastUI>500){lastUI=now;j.tctx&&j.tctx.drawImage(cv,0,0,192,108);upd(j)}};
+   j.prog=m/A.dur;const now=performance.now();if(now-lastUI>500){lastUI=now;try{localStorage.setItem('mm_beat',String(Date.now()))}catch(e){}j.tctx&&j.tctx.drawImage(cv,0,0,192,108);upd(j)}};
   tickW.postMessage(o.fps);
  });
 }
